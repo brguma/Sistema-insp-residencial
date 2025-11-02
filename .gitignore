@@ -1,0 +1,77 @@
+# Sistema de Inspeção Residencial - .gitignore
+
+# Arquivos de sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Node modules (caso use no futuro)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Credenciais (IMPORTANTE!)
+credentials.json
+client_secret*.json
+*.env
+.env.local
+.env.*.local
+
+# Backups
+backup/
+*.backup
+*.old
+
+# Arquivos de teste pessoais
+test/
+tests/
+*.test.html
+
+# Documentação privada
+notas_privadas.txt
+TODO.txt
+
+# Builds e dist (para futuras otimizações)
+dist/
+build/
+
+# Cache do navegador (para testes locais)
+.cache/
