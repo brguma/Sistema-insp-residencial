@@ -425,6 +425,28 @@
             min-height: 60px;
         }
 
+        /* Occurrence Items */
+        .occurrence-item {
+            padding: 15px;
+            background: #f8f9ff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .occurrence-item:not(:first-child) {
+            margin-top: 15px;
+        }
+
+        .occurrence-item textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            min-height: 60px;
+        }
+
         /* Photo Section */
         .photo-section {
             margin-top: 15px;
@@ -1740,6 +1762,11 @@
                 </div>
             `;
 
+            // FOTOS GERAIS - Categoria Especial (apenas na inspeção inicial)
+            if (!isCompleta) {
+                formHTML += generateFotosGerais(baseInspection);
+            }
+
             // Checklists - INSPEÇÃO INICIAL
             formHTML += generateChecklist('estrutura', '1 - Estrutura', [
                 { id: 'fissuras', label: 'Fissuras', info: 'fissuras' },
@@ -1900,6 +1927,71 @@
             initializeCheckboxListeners();
         }
 
+        // Generate FOTOS GERAIS section (special category)
+        function generateFotosGerais(baseInspection) {
+            let html = `
+                <div class="form-section" style="background: #e8f5e9; border-left: 4px solid #4caf50;">
+                    <div class="checklist-section">
+                        <div class="checklist-header">
+                            <h4>📸 FOTOS GERAIS - Obrigatórias</h4>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">Tire fotos de cada cômodo do imóvel</p>
+                        </div>
+            `;
+
+            // Fachada
+            html += generateFotoItem('fotos_fachada', 'Fachada', baseInspection);
+
+            // Sala(s)
+            const qtdSalas = parseInt(document.getElementById('qtdSalas')?.value || baseInspection?.qtdSalas || 1);
+            for (let i = 1; i <= qtdSalas; i++) {
+                const label = qtdSalas > 1 ? `Sala ${i}` : 'Sala';
+                html += generateFotoItem(`fotos_sala${i}`, label, baseInspection);
+            }
+
+            // Cozinha(s)
+            const qtdCozinhas = parseInt(document.getElementById('qtdCozinhas')?.value || baseInspection?.qtdCozinhas || 1);
+            for (let i = 1; i <= qtdCozinhas; i++) {
+                const label = qtdCozinhas > 1 ? `Cozinha ${i}` : 'Cozinha';
+                html += generateFotoItem(`fotos_cozinha${i}`, label, baseInspection);
+            }
+
+            // Quarto(s)
+            const qtdQuartos = parseInt(document.getElementById('qtdQuartos')?.value || baseInspection?.qtdQuartos || 1);
+            const qtdSuites = parseInt(document.getElementById('qtdSuites')?.value || baseInspection?.qtdSuites || 0);
+            const totalQuartos = qtdQuartos + qtdSuites;
+            
+            for (let i = 1; i <= totalQuartos; i++) {
+                const label = totalQuartos > 1 ? `Quarto ${i}` : 'Quarto';
+                html += generateFotoItem(`fotos_quarto${i}`, label, baseInspection);
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        // Generate individual photo item for FOTOS GERAIS
+        function generateFotoItem(itemId, label, baseInspection) {
+            const baseValue = baseInspection?.checklist?.[itemId];
+            
+            return `
+                <div class="checklist-item" style="border-bottom: 1px solid #e0e0e0; padding: 15px 0;">
+                    <div class="checklist-item-label" style="font-weight: 500;">
+                        ${label}
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn btn-primary" onclick="addPhoto('${itemId}')" style="font-size: 12px; padding: 8px 15px;">
+                            📸 Adicionar Foto
+                        </button>
+                    </div>
+                    <div class="photo-preview" id="${itemId}_photos"></div>
+                </div>
+            `;
+        }
+
         // Generate checklist HTML
         function generateChecklist(category, title, items, baseInspection) {
             let html = `
@@ -1932,14 +2024,26 @@
                         </div>
                     </div>
                     <div class="observation-field ${isChecked ? 'active' : ''}" id="${itemId}_obs">
-                        <label style="display: block; margin-bottom: 5px; font-size: 13px; color: #666;">Observação:</label>
-                        <textarea id="${itemId}_text" placeholder="Descreva o problema identificado...">${baseValue?.observation || ''}</textarea>
-                        <div style="margin-top: 10px;">
-                            <button class="btn btn-primary" onclick="addPhoto('${itemId}')" style="font-size: 12px; padding: 8px 15px;">
-                                📸 Adicionar Foto
+                        <div id="${itemId}_occurrences_container">
+                            <!-- Container para múltiplas ocorrências -->
+                            <div class="occurrence-item" id="${itemId}_occurrence_1">
+                                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 5px;">
+                                    <label style="display: block; font-size: 13px; color: #666; font-weight: bold;">Ocorrência 1:</label>
+                                </div>
+                                <textarea id="${itemId}_text_1" placeholder="Descreva o problema identificado..." style="margin-bottom: 10px;">${baseValue?.observation || ''}</textarea>
+                                <div style="margin-bottom: 10px;">
+                                    <button class="btn btn-primary" onclick="addPhoto('${itemId}_1')" style="font-size: 12px; padding: 8px 15px;">
+                                        📸 Adicionar Foto
+                                    </button>
+                                </div>
+                                <div class="photo-preview" id="${itemId}_1_photos"></div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ddd;">
+                            <button class="btn btn-secondary" onclick="addNewOccurrence('${itemId}')" style="font-size: 12px; padding: 8px 15px; background: #28a745;">
+                                ➕ Adicionar Nova Ocorrência deste Problema
                             </button>
                         </div>
-                        <div class="photo-preview" id="${itemId}_photos"></div>
                     </div>
                 `;
             });
@@ -1987,6 +2091,81 @@
                 obsField.classList.add('active');
             } else {
                 obsField.classList.remove('active');
+            }
+        }
+
+        // Add new occurrence of the same problem
+        const occurrenceCounters = {}; // Track occurrence numbers for each item
+        
+        function addNewOccurrence(itemId) {
+            // Initialize counter if not exists
+            if (!occurrenceCounters[itemId]) {
+                occurrenceCounters[itemId] = 1;
+            }
+            
+            // Increment counter
+            occurrenceCounters[itemId]++;
+            const occurrenceNum = occurrenceCounters[itemId];
+            
+            // Get container
+            const container = document.getElementById(`${itemId}_occurrences_container`);
+            
+            // Create new occurrence div
+            const newOccurrence = document.createElement('div');
+            newOccurrence.className = 'occurrence-item';
+            newOccurrence.id = `${itemId}_occurrence_${occurrenceNum}`;
+            newOccurrence.style.marginTop = '20px';
+            newOccurrence.style.paddingTop = '20px';
+            newOccurrence.style.borderTop = '2px solid #e0e0e0';
+            
+            newOccurrence.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="display: block; font-size: 13px; color: #666; font-weight: bold;">Ocorrência ${occurrenceNum}:</label>
+                    <button class="btn btn-secondary" onclick="removeOccurrence('${itemId}', ${occurrenceNum})" 
+                            style="font-size: 11px; padding: 4px 8px; background: #dc3545;">
+                        🗑️ Remover
+                    </button>
+                </div>
+                <textarea id="${itemId}_text_${occurrenceNum}" 
+                          placeholder="Descreva o problema identificado..." 
+                          style="margin-bottom: 10px;"></textarea>
+                <div style="margin-bottom: 10px;">
+                    <button class="btn btn-primary" onclick="addPhoto('${itemId}_${occurrenceNum}')" 
+                            style="font-size: 12px; padding: 8px 15px;">
+                        📸 Adicionar Foto
+                    </button>
+                </div>
+                <div class="photo-preview" id="${itemId}_${occurrenceNum}_photos"></div>
+            `;
+            
+            // Add to container
+            container.appendChild(newOccurrence);
+            
+            // Success feedback
+            playSound('success');
+        }
+
+        // Remove occurrence
+        function removeOccurrence(itemId, occurrenceNum) {
+            if (occurrenceNum === 1) {
+                alert('Não é possível remover a primeira ocorrência. Desmarque o checkbox "Problema" se não houver problema.');
+                return;
+            }
+            
+            if (confirm('Deseja remover esta ocorrência? As fotos associadas também serão removidas.')) {
+                // Remove from DOM
+                const occurrence = document.getElementById(`${itemId}_occurrence_${occurrenceNum}`);
+                if (occurrence) {
+                    occurrence.remove();
+                }
+                
+                // Remove photos from photoData
+                const photoKey = `${itemId}_${occurrenceNum}`;
+                if (photoData[photoKey]) {
+                    delete photoData[photoKey];
+                }
+                
+                playSound('success');
             }
         }
 
@@ -2135,11 +2314,37 @@
             
             document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
                 const itemId = checkbox.id;
-                const textArea = document.getElementById(`${itemId}_text`);
+                
+                // Coletar múltiplas ocorrências
+                const occurrences = [];
+                let occurrenceNum = 1;
+                let textArea = document.getElementById(`${itemId}_text_${occurrenceNum}`);
+                
+                // Se não existe _text_1, tenta sem número (compatibilidade com FOTOS GERAIS)
+                if (!textArea) {
+                    textArea = document.getElementById(`${itemId}_text`);
+                    if (textArea) {
+                        occurrences.push({
+                            observation: textArea.value,
+                            occurrenceNum: 1
+                        });
+                    }
+                } else {
+                    // Coletar todas as ocorrências numeradas
+                    while (textArea) {
+                        occurrences.push({
+                            observation: textArea.value,
+                            occurrenceNum: occurrenceNum
+                        });
+                        occurrenceNum++;
+                        textArea = document.getElementById(`${itemId}_text_${occurrenceNum}`);
+                    }
+                }
                 
                 checklist[itemId] = {
                     status: checkbox.checked ? 'issue' : 'ok',
-                    observation: textArea ? textArea.value : ''
+                    observation: occurrences.length > 0 ? occurrences[0].observation : '', // Compatibilidade
+                    occurrences: occurrences // Novo campo com todas as ocorrências
                 };
             });
             
