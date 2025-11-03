@@ -1709,9 +1709,28 @@
 
             // Se for inspeção completa, carregar fotos da inicial
             if (isCompleta && baseInspection && baseInspection.photos) {
-                photoData = JSON.parse(JSON.stringify(baseInspection.photos)); // Deep copy
+                console.log('🔄 Carregando inspeção completa baseada em:', baseInspection.id);
+                console.log('📸 Fotos na inspeção inicial:', baseInspection.photos);
+                
+                // Mapear fotos antigas (sem numeração) para o novo formato (com _1)
+                photoData = {};
+                Object.keys(baseInspection.photos).forEach(oldKey => {
+                    // Se a chave não termina com _número, adicionar _1
+                    if (!oldKey.match(/_\d+$/)) {
+                        const newKey = `${oldKey}_1`;
+                        photoData[newKey] = baseInspection.photos[oldKey];
+                        console.log(`  🔗 Mapeando: ${oldKey} → ${newKey}`);
+                    } else {
+                        photoData[oldKey] = baseInspection.photos[oldKey];
+                        console.log(`  ✅ Mantendo: ${oldKey}`);
+                    }
+                });
+                
+                console.log('✅ photoData mapeado com sucesso:', Object.keys(photoData).length, 'itens');
+                console.log('📋 Novos IDs:', Object.keys(photoData));
             } else {
                 photoData = {}; // Reset photoData para nova inspeção inicial
+                console.log('🆕 Nova inspeção inicial - photoData resetado');
             }
 
             let formHTML = `
@@ -1969,12 +1988,58 @@
                     });
                 }
                 
-                // Renderizar fotos
-                if (baseInspection.photos) {
-                    Object.keys(baseInspection.photos).forEach(itemId => {
-                        displayPhotos(itemId);
+                // Debug: listar todos os containers de fotos no DOM
+                setTimeout(() => {
+                    const allPhotoContainers = document.querySelectorAll('[id$="_photos"]');
+                    console.log(`🔍 Total de ${allPhotoContainers.length} containers de fotos encontrados no DOM`);
+                    allPhotoContainers.forEach(container => {
+                        console.log(`  - ${container.id}`);
                     });
-                }
+                }, 100);
+                
+                // Renderizar fotos após o DOM estar pronto (com retry)
+                const renderPhotos = (attempt = 1, maxAttempts = 5) => {
+                    if (Object.keys(photoData).length > 0) {
+                        console.log(`📸 Tentativa ${attempt} de carregar fotos. Total de ${Object.keys(photoData).length} conjuntos de fotos`);
+                        console.log('📦 Chaves em photoData:', Object.keys(photoData));
+                        
+                        let successCount = 0;
+                        let failCount = 0;
+                        const failedItems = [];
+                        
+                        Object.keys(photoData).forEach(itemId => {
+                            const container = document.getElementById(`${itemId}_photos`);
+                            if (container) {
+                                console.log(`  ✅ Renderizando ${photoData[itemId].length} foto(s) de: ${itemId}`);
+                                displayPhotos(itemId);
+                                successCount++;
+                            } else {
+                                console.log(`  ⏳ Container não encontrado: ${itemId}_photos`);
+                                failCount++;
+                                failedItems.push(itemId);
+                            }
+                        });
+                        
+                        // Se ainda há containers não encontrados e não atingiu o máximo de tentativas, tentar novamente
+                        if (failCount > 0 && attempt < maxAttempts) {
+                            console.log(`🔄 Aguardando DOM... ${failCount} containers pendentes. Tentando novamente em 300ms`);
+                            console.log(`   Pendentes: ${failedItems.join(', ')}`);
+                            setTimeout(() => renderPhotos(attempt + 1, maxAttempts), 300);
+                        } else {
+                            if (failCount > 0) {
+                                console.warn(`⚠️ Carregamento de fotos finalizado com ${failCount} falhas`);
+                                console.warn(`   Itens não encontrados: ${failedItems.join(', ')}`);
+                            } else {
+                                console.log(`✅ Carregamento de fotos 100% concluído: ${successCount} conjuntos renderizados`);
+                            }
+                        }
+                    } else {
+                        console.log('📭 Nenhuma foto para carregar');
+                    }
+                };
+                
+                // Iniciar renderização após 300ms
+                setTimeout(() => renderPhotos(), 300);
             }
         }
 
@@ -2276,7 +2341,20 @@
         // Display photos
         function displayPhotos(itemId) {
             const container = document.getElementById(`${itemId}_photos`);
+            
+            if (!container) {
+                console.warn(`⚠️ Container ${itemId}_photos não encontrado no DOM`);
+                return;
+            }
+            
             const photos = photoData[itemId] || [];
+            
+            if (photos.length === 0) {
+                console.log(`📭 Nenhuma foto para ${itemId}`);
+                return;
+            }
+            
+            console.log(`📸 Renderizando ${photos.length} foto(s) em ${itemId}_photos`);
             
             container.innerHTML = '';
             
@@ -2682,13 +2760,34 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
 
         // Back to menu
         function backToMenu() {
+            // Fechar todas as telas
             document.getElementById('inspectionForm').classList.remove('active');
             document.getElementById('inspectionForm').innerHTML = '';
-            document.getElementById('mainMenu').classList.add('active');
+            
+            const settingsScreen = document.getElementById('settingsScreen');
+            if (settingsScreen) {
+                settingsScreen.classList.remove('active');
+                settingsScreen.style.display = 'none';
+            }
+            
+            const dbScreen = document.getElementById('inspectionsDatabase');
+            if (dbScreen) {
+                dbScreen.style.display = 'none';
+            }
+            
+            // Mostrar menu principal
+            const mainMenu = document.getElementById('mainMenu');
+            if (mainMenu) {
+                mainMenu.classList.add('active');
+                mainMenu.style.display = 'block';
+            }
+            
+            // Limpar dados temporários
             currentInspection = null;
             currentInspectionType = null;
             selectedInitialInspection = null;
             photoData = {};
+            occurrenceCounters = {};
         }
 
         // Show inspections list (placeholder)
