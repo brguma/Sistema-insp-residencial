@@ -1015,6 +1015,68 @@
             </div>
         </div>
 
+        <!-- Tela: Banco de Dados de Inspeções -->
+        <div id="inspectionsDatabase" class="inspection-form" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📁 Banco de Dados de Inspeções</h2>
+                <button class="btn btn-secondary" onclick="closeDatabaseView()">← Voltar ao Menu</button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="form-section">
+                <h3>🔍 Filtros</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de Inspeção</label>
+                        <select id="filterType" onchange="applyFilters()">
+                            <option value="all">Todas</option>
+                            <option value="inicial">Inspeção Inicial</option>
+                            <option value="completa">Inspeção Completa</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Município</label>
+                        <select id="filterCity" onchange="applyFilters()">
+                            <option value="all">Todos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Buscar por Endereço</label>
+                        <input type="text" id="filterAddress" placeholder="Digite o endereço..." oninput="applyFilters()">
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-secondary" onclick="clearFilters()">🔄 Limpar Filtros</button>
+                </div>
+            </div>
+
+            <!-- Estatísticas Rápidas -->
+            <div class="form-section">
+                <div class="form-row">
+                    <div class="stat-card" style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="dbTotalInspections">0</div>
+                        <div>Total de Inspeções</div>
+                    </div>
+                    <div class="stat-card" style="text-align: center; padding: 20px; background: #4CAF50; border-radius: 10px; color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="dbTotalInicial">0</div>
+                        <div>Inspeções Iniciais</div>
+                    </div>
+                    <div class="stat-card" style="text-align: center; padding: 20px; background: #FF9800; border-radius: 10px; color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="dbTotalCompleta">0</div>
+                        <div>Inspeções Completas</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Inspeções -->
+            <div class="form-section">
+                <h3>📋 Inspeções Cadastradas</h3>
+                <div id="inspectionsListContainer" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Lista será preenchida dinamicamente -->
+                </div>
+            </div>
+        </div>
+
         <!-- Inspection Form -->
         <div id="inspectionForm" class="inspection-form">
             <!-- Form will be generated dynamically -->
@@ -1645,6 +1707,13 @@
                 '<span class="inspection-type-badge badge-completa">INSPEÇÃO COMPLETA</span>' :
                 '<span class="inspection-type-badge badge-inicial">INSPEÇÃO INICIAL</span>';
 
+            // Se for inspeção completa, carregar fotos da inicial
+            if (isCompleta && baseInspection && baseInspection.photos) {
+                photoData = JSON.parse(JSON.stringify(baseInspection.photos)); // Deep copy
+            } else {
+                photoData = {}; // Reset photoData para nova inspeção inicial
+            }
+
             let formHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h2>Nova Inspeção ${badge}</h2>
@@ -1652,36 +1721,53 @@
                 </div>
             `;
 
+            // Aviso explicativo para inspeção completa
+            if (isCompleta) {
+                formHTML += `
+                    <div class="form-section" style="background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%); color: white; border: none;">
+                        <h3 style="color: white; margin-bottom: 10px;">📊 Inspeção Completa - Modo de Edição</h3>
+                        <p style="margin: 0; line-height: 1.6;">
+                            ✅ Todos os dados da <strong>Inspeção Inicial</strong> foram carregados<br>
+                            ✏️ Você pode <strong>EDITAR</strong> qualquer informação da inicial<br>
+                            🗑️ Você pode <strong>REMOVER</strong> problemas ou fotos<br>
+                            ➕ Você pode <strong>ADICIONAR</strong> novos problemas e observações<br>
+                            🔍 Campos extras estão disponíveis para uma vistoria mais detalhada
+                        </p>
+                    </div>
+                `;
+            }
+
             // Seção 1: Dados do Imóvel
             formHTML += `
                 <div class="form-section">
                     <h3>📍 Dados do Imóvel</h3>
+                    ${isCompleta ? '<p style="color: #FF9800; font-size: 13px; margin-bottom: 15px;">💡 Dados importados da inspeção inicial. Você pode editá-los se necessário.</p>' : ''}
                     <div class="form-row">
                         <div class="form-group">
                             <label>Endereço *</label>
-                            <input type="text" id="endereco" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.endereco || ''}" required>
+                            <input type="text" id="endereco" value="${baseInspection?.endereco || ''}" required>
                         </div>
                         <div class="form-group">
                             <label>Número *</label>
-                            <input type="text" id="numero" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.numero || ''}" required>
+                            <input type="text" id="numero" value="${baseInspection?.numero || ''}" required>
                         </div>
                         <div class="form-group">
                             <label>Complemento</label>
-                            <input type="text" id="complemento" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.complemento || ''}">
+                            <input type="text" id="complemento" value="${baseInspection?.complemento || ''}">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Bairro *</label>
-                            <input type="text" id="bairro" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.bairro || ''}" required>
+                            <input type="text" id="bairro" value="${baseInspection?.bairro || ''}" required>
                         </div>
                         <div class="form-group">
                             <label>Município *</label>
-                            <input type="text" id="municipio" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.municipio || ''}" required>
+                            <input type="text" id="municipio" value="${baseInspection?.municipio || ''}" required>
                         </div>
                         <div class="form-group">
                             <label>UF *</label>
-                            <select id="uf" ${isCompleta ? 'disabled' : ''} required>
+                            <select id="uf" required>
                                 <option value="">Selecione</option>
                                 ${getUFOptions(baseInspection?.uf)}
                             </select>
@@ -1694,18 +1780,19 @@
             formHTML += `
                 <div class="form-section">
                     <h3>📅 Data da Vistoria</h3>
+                    ${isCompleta ? '<p style="color: #FF9800; font-size: 13px; margin-bottom: 15px;">💡 Você pode atualizar a data e hora para a vistoria completa.</p>' : ''}
                     <div class="form-row">
                         <div class="form-group">
                             <label>Data da Vistoria *</label>
-                            <input type="date" id="dataVistoria" value="${new Date().toISOString().split('T')[0]}" required>
+                            <input type="date" id="dataVistoria" value="${baseInspection?.dataVistoria || new Date().toISOString().split('T')[0]}" required>
                         </div>
                         <div class="form-group">
                             <label>Hora *</label>
-                            <input type="time" id="horaVistoria" value="${new Date().toTimeString().slice(0,5)}" required>
+                            <input type="time" id="horaVistoria" value="${baseInspection?.horaVistoria || new Date().toTimeString().slice(0,5)}" required>
                         </div>
                         <div class="form-group">
                             <label>Quem Acompanhou *</label>
-                            <input type="text" id="acompanhante" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.acompanhante || ''}" required>
+                            <input type="text" id="acompanhante" value="${baseInspection?.acompanhante || ''}" required>
                         </div>
                     </div>
                 </div>
@@ -1715,45 +1802,46 @@
             formHTML += `
                 <div class="form-section">
                     <h3>🏠 Características do Imóvel</h3>
+                    ${isCompleta ? '<p style="color: #FF9800; font-size: 13px; margin-bottom: 15px;">💡 Dados importados da inspeção inicial. Você pode corrigir se necessário.</p>' : ''}
                     <div class="form-row">
                         <div class="form-group">
                             <label>Idade do Imóvel (anos)</label>
-                            <input type="number" id="idadeImovel" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.idadeImovel || ''}" min="0">
+                            <input type="number" id="idadeImovel" value="${baseInspection?.idadeImovel || ''}" min="0">
                         </div>
                         <div class="form-group">
                             <label>Quantidade de Pavimentos</label>
-                            <input type="number" id="qtdPavimentos" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.qtdPavimentos || ''}" min="1">
+                            <input type="number" id="qtdPavimentos" value="${baseInspection?.qtdPavimentos || ''}" min="1">
                         </div>
                         <div class="form-group">
                             <label>Quantidade de Salas</label>
-                            <input type="number" id="qtdSalas" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.qtdSalas || ''}" min="0">
+                            <input type="number" id="qtdSalas" value="${baseInspection?.qtdSalas || ''}" min="0">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Quantidade de Quartos</label>
-                            <input type="number" id="qtdQuartos" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.qtdQuartos || ''}" min="0">
+                            <input type="number" id="qtdQuartos" value="${baseInspection?.qtdQuartos || ''}" min="0">
                         </div>
                         <div class="form-group">
                             <label>Quantidade de Suítes</label>
-                            <input type="number" id="qtdSuites" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.qtdSuites || ''}" min="0">
+                            <input type="number" id="qtdSuites" value="${baseInspection?.qtdSuites || ''}" min="0">
                         </div>
                         <div class="form-group">
                             <label>Quantidade de Cozinhas</label>
-                            <input type="number" id="qtdCozinhas" ${isCompleta ? 'disabled' : ''} value="${baseInspection?.qtdCozinhas || ''}" min="0">
+                            <input type="number" id="qtdCozinhas" value="${baseInspection?.qtdCozinhas || ''}" min="0">
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Possui Quintal?</label>
-                            <select id="possuiQuintal" ${isCompleta ? 'disabled' : ''}>
+                            <select id="possuiQuintal">
                                 <option value="nao" ${baseInspection?.possuiQuintal === 'nao' ? 'selected' : ''}>Não</option>
                                 <option value="sim" ${baseInspection?.possuiQuintal === 'sim' ? 'selected' : ''}>Sim</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label>Possui Garagem?</label>
-                            <select id="possuiGaragem" ${isCompleta ? 'disabled' : ''}>
+                            <select id="possuiGaragem">
                                 <option value="nao" ${baseInspection?.possuiGaragem === 'nao' ? 'selected' : ''}>Não</option>
                                 <option value="sim" ${baseInspection?.possuiGaragem === 'sim' ? 'selected' : ''}>Sim</option>
                             </select>
@@ -1775,28 +1863,49 @@
                 { id: 'recalque', label: 'Recalque', info: 'recalque' }
             ], baseInspection);
 
-            formHTML += generateChecklist('eletrica', '2 - Instalações Elétricas', [
+            // Inspeção Inicial: apenas quadro e fiação
+            // Inspeção Completa: adiciona tomadas e interruptores
+            const eletricaItems = [
                 { id: 'quadro', label: 'Estado Quadro de Distribuição' },
-                { id: 'fiacao', label: 'Fiação Aparente' },
-                { id: 'tomadas', label: 'Tomadas' },
-                { id: 'interruptores', label: 'Interruptores' }
-            ], baseInspection);
+                { id: 'fiacao', label: 'Fiação Aparente' }
+            ];
+            if (isCompleta) {
+                eletricaItems.push(
+                    { id: 'tomadas', label: 'Tomadas' },
+                    { id: 'interruptores', label: 'Interruptores' }
+                );
+            }
+            formHTML += generateChecklist('eletrica', '2 - Instalações Elétricas', eletricaItems, baseInspection);
 
-            formHTML += generateChecklist('hidro', '3 - Instalações Hidrossanitárias', [
-                { id: 'vazamento', label: 'Sinais de Vazamento', info: 'vazamento' },
-                { id: 'tubulacoes', label: 'Tubulações' },
-                { id: 'registros', label: 'Registros' },
-                { id: 'loucas', label: 'Louças' },
-                { id: 'caixas', label: 'Caixas d\'água' }
-            ], baseInspection);
+            // Inspeção Inicial: apenas sinais de vazamento
+            // Inspeção Completa: adiciona tubulações, registros, louças, caixas d'água
+            const hidroItems = [
+                { id: 'vazamento', label: 'Sinais de Vazamento', info: 'vazamento' }
+            ];
+            if (isCompleta) {
+                hidroItems.push(
+                    { id: 'tubulacoes', label: 'Tubulações' },
+                    { id: 'registros', label: 'Registros' },
+                    { id: 'loucas', label: 'Louças' },
+                    { id: 'caixas', label: 'Caixas d\'água' }
+                );
+            }
+            formHTML += generateChecklist('hidro', '3 - Instalações Hidrossanitárias', hidroItems, baseInspection);
 
-            formHTML += generateChecklist('cobertura', '4 - Cobertura e Impermeabilização', [
+            // Inspeção Inicial: goteiras e infiltrações
+            // Inspeção Completa: adiciona telhado, calhas, impermeabilização
+            const coberturaItems = [
                 { id: 'goteiras', label: 'Presença de Goteiras', info: 'goteiras' },
-                { id: 'infiltracoes', label: 'Infiltrações', info: 'infiltracao' },
-                { id: 'telhado', label: 'Telhado' },
-                { id: 'calhas', label: 'Calhas' },
-                { id: 'impermeabilizacao', label: 'Impermeabilização' }
-            ], baseInspection);
+                { id: 'infiltracoes', label: 'Infiltrações', info: 'infiltracao' }
+            ];
+            if (isCompleta) {
+                coberturaItems.push(
+                    { id: 'telhado', label: 'Telhado' },
+                    { id: 'calhas', label: 'Calhas' },
+                    { id: 'impermeabilizacao', label: 'Impermeabilização' }
+                );
+            }
+            formHTML += generateChecklist('cobertura', '4 - Cobertura e Impermeabilização', coberturaItems, baseInspection);
 
             formHTML += generateChecklist('revestimento', '5 - Revestimento e Acabamentos', [
                 { id: 'paredes', label: 'Paredes' },
@@ -1806,13 +1915,20 @@
                 { id: 'manchas', label: 'Manchas', info: 'manchas' }
             ], baseInspection);
 
-            formHTML += generateChecklist('esquadrias', '6 - Esquadrias', [
+            // Inspeção Inicial: funcionamento e conservação
+            // Inspeção Completa: adiciona portas, janelas, vedação
+            const esquadriasItems = [
                 { id: 'funcionamento', label: 'Funcionamento' },
-                { id: 'conservacao', label: 'Estado de Conservação' },
-                { id: 'portas', label: 'Portas' },
-                { id: 'janelas', label: 'Janelas' },
-                { id: 'vedacao', label: 'Vedação' }
-            ], baseInspection);
+                { id: 'conservacao', label: 'Estado de Conservação' }
+            ];
+            if (isCompleta) {
+                esquadriasItems.push(
+                    { id: 'portas', label: 'Portas' },
+                    { id: 'janelas', label: 'Janelas' },
+                    { id: 'vedacao', label: 'Vedação' }
+                );
+            }
+            formHTML += generateChecklist('esquadrias', '6 - Esquadrias', esquadriasItems, baseInspection);
 
             formHTML += generateChecklist('infra', '7 - Infraestrutura', [
                 { id: 'redeAgua', label: 'Conexão à Rede de Água' },
@@ -1825,91 +1941,6 @@
             formHTML += generateChecklist('outros', '8 - Outros Problemas Identificados', [
                 { id: 'outros', label: 'Descrever Outros Problemas' }
             ], baseInspection);
-
-            // CAMPOS ADICIONAIS PARA INSPEÇÃO COMPLETA
-            if (isCompleta) {
-                formHTML += `
-                    <div class="form-section" style="border: 3px solid #FF9800;">
-                        <h3 style="color: #FF9800;">📊 Campos Adicionais - Inspeção Completa</h3>
-                        <p style="color: #666; margin-bottom: 20px;">Os campos abaixo são exclusivos da inspeção completa</p>
-                `;
-
-                // Adicionar campos do checklist 2 que não estão na inicial
-                formHTML += `
-                        <div class="form-group">
-                            <label>Observações Gerais da Inspeção Completa</label>
-                            <textarea id="obsCompleta" placeholder="Adicione observações gerais sobre a inspeção completa"></textarea>
-                        </div>
-
-                        <h4 style="margin: 20px 0 10px; color: #333;">Avaliações Detalhadas</h4>
-                        
-                        <div class="form-group">
-                            <label>Estado Geral da Estrutura</label>
-                            <select id="estadoEstrutura">
-                                <option value="">Selecione</option>
-                                <option value="excelente">Excelente</option>
-                                <option value="bom">Bom</option>
-                                <option value="regular">Regular</option>
-                                <option value="ruim">Ruim</option>
-                                <option value="pessimo">Péssimo</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Estado Geral das Instalações Elétricas</label>
-                            <select id="estadoEletrica">
-                                <option value="">Selecione</option>
-                                <option value="excelente">Excelente</option>
-                                <option value="bom">Bom</option>
-                                <option value="regular">Regular</option>
-                                <option value="ruim">Ruim</option>
-                                <option value="pessimo">Péssimo</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Estado Geral das Instalações Hidráulicas</label>
-                            <select id="estadoHidraulica">
-                                <option value="">Selecione</option>
-                                <option value="excelente">Excelente</option>
-                                <option value="bom">Bom</option>
-                                <option value="regular">Regular</option>
-                                <option value="ruim">Ruim</option>
-                                <option value="pessimo">Péssimo</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Necessita Reforma?</label>
-                            <select id="necessitaReforma">
-                                <option value="nao">Não</option>
-                                <option value="sim">Sim</option>
-                                <option value="urgente">Sim - Urgente</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Estimativa de Custo de Reparos (R$)</label>
-                            <input type="number" id="custoReparos" placeholder="0.00" step="0.01" min="0">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Prazo Estimado para Reparos (dias)</label>
-                            <input type="number" id="prazoReparos" placeholder="0" min="0">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Recomendações Técnicas</label>
-                            <textarea id="recomendacoes" placeholder="Descreva as recomendações técnicas para o imóvel"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Conclusão da Inspeção</label>
-                            <textarea id="conclusao" placeholder="Conclusão geral sobre o estado do imóvel"></textarea>
-                        </div>
-                    </div>
-                `;
-            }
 
             // Form Actions
             formHTML += `
@@ -1925,6 +1956,26 @@
 
             // Add event listeners for checkboxes
             initializeCheckboxListeners();
+            
+            // Se for inspeção completa, renderizar fotos carregadas da inicial
+            if (isCompleta && baseInspection) {
+                // Inicializar occurrenceCounters com base nas ocorrências carregadas
+                if (baseInspection.checklist) {
+                    Object.keys(baseInspection.checklist).forEach(itemId => {
+                        const item = baseInspection.checklist[itemId];
+                        if (item.occurrences && item.occurrences.length > 1) {
+                            occurrenceCounters[itemId] = item.occurrences.length;
+                        }
+                    });
+                }
+                
+                // Renderizar fotos
+                if (baseInspection.photos) {
+                    Object.keys(baseInspection.photos).forEach(itemId => {
+                        displayPhotos(itemId);
+                    });
+                }
+            }
         }
 
         // Generate FOTOS GERAIS section (special category)
@@ -2007,10 +2058,13 @@
                 const baseValue = baseInspection?.checklist?.[itemId];
                 const isChecked = baseValue?.status === 'issue';
                 
+                // Verificar se é um item novo (só existe na completa)
+                const isNewItem = !baseValue && baseInspection; // Se não tem valor base E existe inspeção base, é novo
+                
                 html += `
-                    <div class="checklist-item">
+                    <div class="checklist-item" ${isNewItem ? 'style="background: #fff3cd; border-left: 4px solid #FF9800;"' : ''}>
                         <div class="checklist-item-label">
-                            ${item.label}
+                            ${isNewItem ? '🆕 ' : ''}${item.label}
                             ${item.info ? createInfoIcon(item.info) : ''}
                         </div>
                         <div class="checklist-options">
@@ -2026,18 +2080,38 @@
                     <div class="observation-field ${isChecked ? 'active' : ''}" id="${itemId}_obs">
                         <div id="${itemId}_occurrences_container">
                             <!-- Container para múltiplas ocorrências -->
-                            <div class="occurrence-item" id="${itemId}_occurrence_1">
-                                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 5px;">
-                                    <label style="display: block; font-size: 13px; color: #666; font-weight: bold;">Ocorrência 1:</label>
-                                </div>
-                                <textarea id="${itemId}_text_1" placeholder="Descreva o problema identificado..." style="margin-bottom: 10px;">${baseValue?.observation || ''}</textarea>
-                                <div style="margin-bottom: 10px;">
-                                    <button class="btn btn-primary" onclick="addPhoto('${itemId}_1')" style="font-size: 12px; padding: 8px 15px;">
-                                        📸 Adicionar Foto
+                `;
+                
+                // Se tiver ocorrências salvas, criar uma div para cada
+                const occurrences = baseValue?.occurrences || [{ observation: baseValue?.observation || '', occurrenceNum: 1 }];
+                
+                occurrences.forEach((occ, index) => {
+                    const occNum = occ.occurrenceNum || (index + 1);
+                    const isFirst = occNum === 1;
+                    
+                    html += `
+                        <div class="occurrence-item" id="${itemId}_occurrence_${occNum}" ${!isFirst ? 'style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e0e0e0;"' : ''}>
+                            <div style="display: flex; justify-content: ${isFirst ? 'between' : 'space-between'}; align-items: center; margin-bottom: 5px;">
+                                <label style="display: block; font-size: 13px; color: #666; font-weight: bold;">Ocorrência ${occNum}:</label>
+                                ${!isFirst ? `
+                                    <button class="btn btn-secondary" onclick="removeOccurrence('${itemId}', ${occNum})" 
+                                            style="font-size: 11px; padding: 4px 8px; background: #dc3545;">
+                                        🗑️ Remover
                                     </button>
-                                </div>
-                                <div class="photo-preview" id="${itemId}_1_photos"></div>
+                                ` : ''}
                             </div>
+                            <textarea id="${itemId}_text_${occNum}" placeholder="Descreva o problema identificado..." style="margin-bottom: 10px;">${occ.observation || ''}</textarea>
+                            <div style="margin-bottom: 10px;">
+                                <button class="btn btn-primary" onclick="addPhoto('${itemId}_${occNum}')" style="font-size: 12px; padding: 8px 15px;">
+                                    📸 Adicionar Foto
+                                </button>
+                            </div>
+                            <div class="photo-preview" id="${itemId}_${occNum}_photos"></div>
+                        </div>
+                    `;
+                });
+                
+                html += `
                         </div>
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ddd;">
                             <button class="btn btn-secondary" onclick="addNewOccurrence('${itemId}')" style="font-size: 12px; padding: 8px 15px; background: #28a745;">
@@ -2619,7 +2693,240 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
 
         // Show inspections list (placeholder)
         function showInspectionsList() {
-            alert('Funcionalidade de listagem em desenvolvimento. As inspeções estão salvas no Google Drive!');
+            // Ocultar outras telas
+            document.getElementById('mainMenu').classList.remove('active');
+            document.getElementById('inspectionForm').classList.remove('active');
+            
+            // Mostrar tela de banco de dados
+            const dbScreen = document.getElementById('inspectionsDatabase');
+            dbScreen.style.display = 'block';
+            
+            // Carregar dados
+            loadDatabaseView();
+        }
+
+        function closeDatabaseView() {
+            document.getElementById('inspectionsDatabase').style.display = 'none';
+            document.getElementById('mainMenu').classList.add('active');
+        }
+
+        function loadDatabaseView() {
+            // Atualizar estatísticas
+            const totalInspections = inspections.length;
+            const totalInicial = inspections.filter(i => i.type === 'inicial').length;
+            const totalCompleta = inspections.filter(i => i.type === 'completa').length;
+            
+            document.getElementById('dbTotalInspections').textContent = totalInspections;
+            document.getElementById('dbTotalInicial').textContent = totalInicial;
+            document.getElementById('dbTotalCompleta').textContent = totalCompleta;
+            
+            // Preencher dropdown de cidades
+            const cities = new Set();
+            inspections.forEach(i => {
+                if (i.municipio) cities.add(i.municipio);
+            });
+            
+            const cityFilter = document.getElementById('filterCity');
+            cityFilter.innerHTML = '<option value="all">Todos</option>';
+            Array.from(cities).sort().forEach(city => {
+                cityFilter.innerHTML += `<option value="${city}">${city}</option>`;
+            });
+            
+            // Renderizar lista
+            renderInspectionsList(inspections);
+        }
+
+        function renderInspectionsList(filteredInspections) {
+            const container = document.getElementById('inspectionsListContainer');
+            
+            if (filteredInspections.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
+                        <p>Nenhuma inspeção encontrada</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Ordenar por data (mais recentes primeiro)
+            const sorted = [...filteredInspections].sort((a, b) => {
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+            
+            let html = '';
+            sorted.forEach(inspection => {
+                const typeBadge = inspection.type === 'inicial' ? 
+                    '<span class="inspection-type-badge badge-inicial">INICIAL</span>' :
+                    '<span class="inspection-type-badge badge-completa">COMPLETA</span>';
+                
+                const problems = countProblems(inspection);
+                const photos = countPhotos(inspection);
+                
+                html += `
+                    <div class="inspection-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; cursor: pointer; transition: all 0.3s;" 
+                         onclick="showInspectionDetails('${inspection.id}')"
+                         onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                         onmouseout="this.style.boxShadow='none'">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                    <h4 style="margin: 0; color: #333;">${inspection.endereco}, ${inspection.numero}</h4>
+                                    ${typeBadge}
+                                </div>
+                                <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                                    📍 ${inspection.bairro}, ${inspection.municipio}/${inspection.uf}
+                                </p>
+                            </div>
+                            <div style="text-align: right; font-size: 13px; color: #999;">
+                                📅 ${formatDate(inspection.dataVistoria)}<br>
+                                🕐 ${inspection.horaVistoria}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 20px; padding-top: 10px; border-top: 1px solid #f0f0f0; font-size: 13px;">
+                            <div style="color: ${problems > 0 ? '#f44336' : '#4caf50'};">
+                                ⚠️ ${problems} problema${problems !== 1 ? 's' : ''}
+                            </div>
+                            <div style="color: #2196f3;">
+                                📸 ${photos} foto${photos !== 1 ? 's' : ''}
+                            </div>
+                            <div style="color: #666;">
+                                👤 ${inspection.acompanhante}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function countProblems(inspection) {
+            let count = 0;
+            if (inspection.checklist) {
+                Object.values(inspection.checklist).forEach(item => {
+                    if (item.status === 'issue') count++;
+                });
+            }
+            return count;
+        }
+
+        function countPhotos(inspection) {
+            let count = 0;
+            if (inspection.photos) {
+                Object.values(inspection.photos).forEach(photoArray => {
+                    if (Array.isArray(photoArray)) {
+                        count += photoArray.length;
+                    }
+                });
+            }
+            return count;
+        }
+
+        function applyFilters() {
+            const typeFilter = document.getElementById('filterType').value;
+            const cityFilter = document.getElementById('filterCity').value;
+            const addressFilter = document.getElementById('filterAddress').value.toLowerCase();
+            
+            let filtered = inspections;
+            
+            // Filtro por tipo
+            if (typeFilter !== 'all') {
+                filtered = filtered.filter(i => i.type === typeFilter);
+            }
+            
+            // Filtro por cidade
+            if (cityFilter !== 'all') {
+                filtered = filtered.filter(i => i.municipio === cityFilter);
+            }
+            
+            // Filtro por endereço
+            if (addressFilter) {
+                filtered = filtered.filter(i => 
+                    i.endereco.toLowerCase().includes(addressFilter) ||
+                    i.bairro.toLowerCase().includes(addressFilter)
+                );
+            }
+            
+            renderInspectionsList(filtered);
+        }
+
+        function clearFilters() {
+            document.getElementById('filterType').value = 'all';
+            document.getElementById('filterCity').value = 'all';
+            document.getElementById('filterAddress').value = '';
+            renderInspectionsList(inspections);
+        }
+
+        function showInspectionDetails(inspectionId) {
+            const inspection = inspections.find(i => i.id === inspectionId);
+            if (!inspection) {
+                alert('Inspeção não encontrada!');
+                return;
+            }
+            
+            // Criar modal com detalhes
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.style.zIndex = '2000';
+            
+            const typeBadge = inspection.type === 'inicial' ? 
+                '<span class="inspection-type-badge badge-inicial">INICIAL</span>' :
+                '<span class="inspection-type-badge badge-completa">COMPLETA</span>';
+            
+            const problems = countProblems(inspection);
+            const photos = countPhotos(inspection);
+            
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2>Detalhes da Inspeção ${typeBadge}</h2>
+                    </div>
+                    <div style="max-height: 60vh; overflow-y: auto;">
+                        <div class="form-section">
+                            <h4>📍 Dados do Imóvel</h4>
+                            <p><strong>Endereço:</strong> ${inspection.endereco}, ${inspection.numero}</p>
+                            ${inspection.complemento ? `<p><strong>Complemento:</strong> ${inspection.complemento}</p>` : ''}
+                            <p><strong>Bairro:</strong> ${inspection.bairro}</p>
+                            <p><strong>Município:</strong> ${inspection.municipio}</p>
+                            <p><strong>UF:</strong> ${inspection.uf}</p>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h4>📅 Informações da Vistoria</h4>
+                            <p><strong>Data:</strong> ${formatDate(inspection.dataVistoria)}</p>
+                            <p><strong>Hora:</strong> ${inspection.horaVistoria}</p>
+                            <p><strong>Acompanhante:</strong> ${inspection.acompanhante}</p>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h4>🏠 Características</h4>
+                            ${inspection.idadeImovel ? `<p><strong>Idade:</strong> ${inspection.idadeImovel} anos</p>` : ''}
+                            ${inspection.qtdPavimentos ? `<p><strong>Pavimentos:</strong> ${inspection.qtdPavimentos}</p>` : ''}
+                            ${inspection.qtdSalas ? `<p><strong>Salas:</strong> ${inspection.qtdSalas}</p>` : ''}
+                            ${inspection.qtdQuartos ? `<p><strong>Quartos:</strong> ${inspection.qtdQuartos}</p>` : ''}
+                            ${inspection.qtdSuites ? `<p><strong>Suítes:</strong> ${inspection.qtdSuites}</p>` : ''}
+                            ${inspection.qtdCozinhas ? `<p><strong>Cozinhas:</strong> ${inspection.qtdCozinhas}</p>` : ''}
+                        </div>
+                        
+                        <div class="form-section">
+                            <h4>⚠️ Resumo</h4>
+                            <p><strong>Problemas encontrados:</strong> ${problems}</p>
+                            <p><strong>Fotos registradas:</strong> ${photos}</p>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
+                        <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Fechar</button>
+                        <button class="btn btn-primary" onclick="downloadInspectionReport('${inspection.id}')">📄 Baixar Relatório</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function downloadInspectionReport(inspectionId) {
+            alert('Funcionalidade de geração de relatório em desenvolvimento!');
         }
 
         // ========================================================================
