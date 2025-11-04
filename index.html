@@ -2246,35 +2246,29 @@
             return date.toLocaleDateString('pt-BR');
         }
 
-        // Create inspection form
-        // Função para ocultar TODAS as telas
+        // Função para ocultar TODAS as telas (previne sobreposição)
         function hideAllScreens() {
-            // Ocultar menu principal
             document.getElementById('mainMenu').classList.remove('active');
-            
-            // Ocultar banco de dados
             document.getElementById('inspectionsDatabase').style.display = 'none';
-            
-            // Ocultar formulário
             document.getElementById('inspectionForm').classList.remove('active');
             
-            // Ocultar tela de configurações
-            document.getElementById('settingsScreen').style.display = 'none';
+            const settingsScreen = document.getElementById('settingsScreen');
+            if (settingsScreen) settingsScreen.style.display = 'none';
             
-            // Ocultar painel admin
-            document.getElementById('adminPanel').style.display = 'none';
+            const adminPanel = document.getElementById('adminPanel');
+            if (adminPanel) adminPanel.style.display = 'none';
             
-            // Ocultar modais
             document.getElementById('inspectionTypeModal').classList.remove('active');
             document.getElementById('selectInitialModal').classList.remove('active');
         }
 
+        // Create inspection form
         function createInspectionForm(type, baseInspection) {
             console.log('🏗️ Criando formulário de inspeção...');
             console.log('📋 Tipo:', type);
             console.log('📦 BaseInspection recebida:', baseInspection);
             
-            // OCULTAR TODAS AS TELAS ANTES DE MOSTRAR O FORMULÁRIO
+            // Ocultar todas as telas primeiro
             hideAllScreens();
             
             if (baseInspection) {
@@ -3184,13 +3178,10 @@
                                 checkPageBreak(90);
                                 
                                 try {
-                                    // Preparar imagem para melhor compatibilidade
-                                    const preparedImage = await prepareImageForPDF(fotos[j]);
-                                    
                                     const imgWidth = 80;
                                     const imgHeight = 60;
                                     
-                                    doc.addImage(preparedImage, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    doc.addImage(fotos[j], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
                                     
                                     doc.setFontSize(9);
                                     doc.setFont(undefined, 'italic');
@@ -3274,13 +3265,10 @@
                                 checkPageBreak(90);
                                 
                                 try {
-                                    // Preparar imagem
-                                    const preparedImage = await prepareImageForPDF(fotoGeral.fotos[i]);
-                                    
                                     const imgWidth = 80;
                                     const imgHeight = 60;
                                     
-                                    doc.addImage(preparedImage, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    doc.addImage(fotoGeral.fotos[i], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
                                     
                                     doc.setFontSize(9);
                                     doc.setFont(undefined, 'italic');
@@ -3363,383 +3351,6 @@
                 return nome;
             }
             return itemId;
-        }
-
-        // Função auxiliar para validar e preparar imagem para PDF
-        function prepareImageForPDF(imageData) {
-            return new Promise((resolve, reject) => {
-                // Se já é uma string base64 válida
-                if (typeof imageData === 'string' && imageData.includes('data:image')) {
-                    const img = new Image();
-                    img.onload = function() {
-                        // Criar canvas para redimensionar/converter
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        // Limitar tamanho para otimizar PDF
-                        const maxWidth = 800;
-                        const maxHeight = 600;
-                        let width = img.width;
-                        let height = img.height;
-                        
-                        if (width > maxWidth || height > maxHeight) {
-                            const ratio = Math.min(maxWidth / width, maxHeight / height);
-                            width = width * ratio;
-                            height = height * ratio;
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // Converter para JPEG com compressão
-                        const optimizedImage = canvas.toDataURL('image/jpeg', 0.85);
-                        resolve(optimizedImage);
-                    };
-                    img.onerror = () => reject(new Error('Erro ao carregar imagem'));
-                    img.src = imageData;
-                } else {
-                    reject(new Error('Formato de imagem inválido'));
-                }
-            });
-        }
-
-        // Gerar PDF de inspeção do banco de dados
-        async function generatePDFFromDatabase(inspectionId) {
-            // Encontrar inspeção
-            const inspection = inspections.find(i => i.id === inspectionId);
-            
-            if (!inspection) {
-                alert('❌ Inspeção não encontrada!');
-                return;
-            }
-            
-            // Verificar se jsPDF está disponível
-            if (typeof window.jspdf === 'undefined') {
-                alert('⚠️ Biblioteca jsPDF não carregada. Recarregue a página e tente novamente.');
-                return;
-            }
-            
-            try {
-                showProgress('Gerando relatório PDF...');
-                
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('p', 'mm', 'a4');
-                
-                let yPos = 20;
-                const pageHeight = doc.internal.pageSize.height;
-                const pageWidth = doc.internal.pageSize.width;
-                const margin = 15;
-                const maxWidth = pageWidth - (2 * margin);
-                
-                const checkPageBreak = (neededSpace = 20) => {
-                    if (yPos + neededSpace > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
-                        return true;
-                    }
-                    return false;
-                };
-                
-                // Título
-                doc.setFontSize(20);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(102, 126, 234);
-                doc.text('RELATÓRIO DE INSPEÇÃO RESIDENCIAL', margin, yPos);
-                yPos += 10;
-                
-                // Tipo
-                doc.setFontSize(14);
-                doc.setTextColor(100, 100, 100);
-                const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
-                doc.text(tipoTexto, margin, yPos);
-                yPos += 15;
-                
-                // Linha divisória
-                doc.setDrawColor(102, 126, 234);
-                doc.setLineWidth(0.5);
-                doc.line(margin, yPos, pageWidth - margin, yPos);
-                yPos += 10;
-                
-                // DADOS DO IMÓVEL
-                doc.setFontSize(14);
-                doc.setTextColor(0, 0, 0);
-                doc.setFont(undefined, 'bold');
-                doc.text('DADOS DO IMÓVEL', margin, yPos);
-                yPos += 8;
-                
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'normal');
-                
-                const dadosImovel = [
-                    ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
-                    ['Complemento:', inspection.complemento || 'N/A'],
-                    ['Bairro:', inspection.bairro],
-                    ['Município/UF:', `${inspection.municipio} - ${inspection.uf}`],
-                    ['Data da Vistoria:', inspection.dataVistoria],
-                    ['Hora da Vistoria:', inspection.horaVistoria],
-                    ['Acompanhante:', inspection.acompanhante],
-                    ['Idade do Imóvel:', `${inspection.idadeImovel} anos`]
-                ];
-                
-                dadosImovel.forEach(([label, value]) => {
-                    checkPageBreak();
-                    doc.setFont(undefined, 'bold');
-                    doc.text(label, margin, yPos);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(String(value), margin + 45, yPos);
-                    yPos += 6;
-                });
-                
-                yPos += 5;
-                
-                // CARACTERÍSTICAS
-                checkPageBreak(30);
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
-                doc.text('CARACTERÍSTICAS DO IMÓVEL', margin, yPos);
-                yPos += 8;
-                
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'normal');
-                
-                const caracteristicas = [
-                    ['Pavimentos:', inspection.qtdPavimentos || 'N/A'],
-                    ['Salas:', inspection.qtdSalas || 'N/A'],
-                    ['Quartos:', inspection.qtdQuartos || 'N/A'],
-                    ['Suítes:', inspection.qtdSuites || 'N/A'],
-                    ['Cozinhas:', inspection.qtdCozinhas || 'N/A'],
-                    ['Quintal:', inspection.possuiQuintal || 'N/A'],
-                    ['Garagem:', inspection.possuiGaragem || 'N/A']
-                ];
-                
-                caracteristicas.forEach(([label, value]) => {
-                    checkPageBreak();
-                    doc.setFont(undefined, 'bold');
-                    doc.text(label, margin, yPos);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(String(value), margin + 45, yPos);
-                    yPos += 6;
-                });
-                
-                yPos += 10;
-                
-                // PROBLEMAS ENCONTRADOS
-                const problemasEncontrados = [];
-                
-                if (inspection.checklist) {
-                    Object.keys(inspection.checklist).forEach(itemId => {
-                        const item = inspection.checklist[itemId];
-                        if (item.status === 'issue') {
-                            const categoryName = getCategoryNameFromId(itemId);
-                            const itemName = getItemNameFromId(itemId);
-                            
-                            if (item.occurrences && item.occurrences.length > 0) {
-                                item.occurrences.forEach((occ, index) => {
-                                    const occNum = occ.occurrenceNum || (index + 1);
-                                    problemasEncontrados.push({
-                                        categoria: categoryName,
-                                        item: itemName,
-                                        ocorrencia: occNum,
-                                        observacao: occ.observation || 'Sem observação',
-                                        photoKey: `${itemId}_${occNum}`
-                                    });
-                                });
-                            } else if (item.observation) {
-                                problemasEncontrados.push({
-                                    categoria: categoryName,
-                                    item: itemName,
-                                    ocorrencia: 1,
-                                    observacao: item.observation,
-                                    photoKey: `${itemId}_1`
-                                });
-                            }
-                        }
-                    });
-                }
-                
-                if (problemasEncontrados.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(220, 53, 69);
-                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                    
-                    doc.setFontSize(10);
-                    
-                    for (let i = 0; i < problemasEncontrados.length; i++) {
-                        const problema = problemasEncontrados[i];
-                        
-                        checkPageBreak(30);
-                        
-                        // Número do problema
-                        doc.setFont(undefined, 'bold');
-                        doc.setFontSize(11);
-                        doc.text(`${i + 1}. ${problema.categoria} - ${problema.item}`, margin, yPos);
-                        yPos += 6;
-                        
-                        // Observação
-                        doc.setFont(undefined, 'normal');
-                        doc.setFontSize(10);
-                        const obsText = `Observação: ${problema.observacao}`;
-                        const obsLines = doc.splitTextToSize(obsText, maxWidth - 10);
-                        obsLines.forEach(line => {
-                            checkPageBreak();
-                            doc.text(line, margin + 5, yPos);
-                            yPos += 5;
-                        });
-                        
-                        yPos += 3;
-                        
-                        // Adicionar fotos se existirem
-                        if (inspection.photos && inspection.photos[problema.photoKey]) {
-                            const fotos = inspection.photos[problema.photoKey];
-                            
-                            for (let j = 0; j < fotos.length; j++) {
-                                checkPageBreak(90);
-                                
-                                try {
-                                    // Preparar imagem
-                                    const preparedImage = await prepareImageForPDF(fotos[j]);
-                                    
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
-                                    doc.addImage(preparedImage, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                    
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`Foto ${j + 1} - ${problema.observacao}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
-                                    
-                                    yPos += imgHeight + 10;
-                                } catch (error) {
-                                    console.error('Erro ao adicionar foto:', error);
-                                    doc.setFontSize(9);
-                                    doc.setTextColor(200, 0, 0);
-                                    doc.text(`[Erro ao carregar foto ${j + 1}]`, margin + 10, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    yPos += 6;
-                                }
-                            }
-                        } else {
-                            doc.setFontSize(9);
-                            doc.setTextColor(150, 150, 150);
-                            doc.text('(Sem fotos anexadas)', margin + 10, yPos);
-                            doc.setTextColor(0, 0, 0);
-                            doc.setFontSize(10);
-                            yPos += 6;
-                        }
-                        
-                        yPos += 8;
-                    }
-                } else {
-                    checkPageBreak(20);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                    yPos += 10;
-                    
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    doc.setTextColor(0, 150, 0);
-                    doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                }
-                
-                // FOTOS GERAIS
-                const fotosGerais = [];
-                if (inspection.photos) {
-                    Object.keys(inspection.photos).forEach(key => {
-                        if (key.startsWith('fotos_')) {
-                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
-                            fotosGerais.push({
-                                key: key,
-                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
-                                fotos: inspection.photos[key]
-                            });
-                        }
-                    });
-                }
-                
-                if (fotosGerais.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(102, 126, 234);
-                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                    
-                    for (const fotoGeral of fotosGerais) {
-                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
-                            checkPageBreak(25);
-                            
-                            doc.setFontSize(11);
-                            doc.setFont(undefined, 'bold');
-                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
-                            yPos += 6;
-                            
-                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
-                                checkPageBreak(90);
-                                
-                                try {
-                                    const preparedImage = await prepareImageForPDF(fotoGeral.fotos[i]);
-                                    
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
-                                    doc.addImage(preparedImage, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                    
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`${fotoGeral.nome} - Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
-                                    
-                                    yPos += imgHeight + 10;
-                                } catch (error) {
-                                    console.error('Erro ao adicionar foto geral:', error);
-                                }
-                            }
-                            
-                            yPos += 5;
-                        }
-                    }
-                }
-                
-                // Rodapé
-                const totalPages = doc.internal.pages.length - 1;
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(8);
-                    doc.setTextColor(150, 150, 150);
-                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
-                    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
-                }
-                
-                // Salvar
-                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.pdf`;
-                doc.save(nomeArquivo);
-                
-                hideProgress();
-                playSound('success');
-                alert('✅ Relatório PDF gerado com sucesso!');
-                
-            } catch (error) {
-                hideProgress();
-                console.error('Erro ao gerar PDF:', error);
-                alert('❌ Erro ao gerar PDF:\n\n' + error.message + '\n\nVerifique o console para mais detalhes.');
-            }
         }
 
         // Save inspection
@@ -4147,19 +3758,6 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             // Mostrar menu principal
             document.getElementById('mainMenu').classList.add('active');
             
-            // Resetar variáveis
-            currentInspection = null;
-            currentInspectionType = null;
-            selectedInitialInspection = null;
-            photoData = {};
-        }
-            // Mostrar menu principal
-            const mainMenu = document.getElementById('mainMenu');
-            if (mainMenu) {
-                mainMenu.classList.add('active');
-                mainMenu.style.display = 'block';
-            }
-            
             // Limpar dados temporários
             currentInspection = null;
             currentInspectionType = null;
@@ -4170,7 +3768,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
 
         // Show inspections list (placeholder)
         async function showInspectionsList() {
-            // Ocultar TODAS as telas
+            // Ocultar todas as telas
             hideAllScreens();
             
             // Mostrar tela de banco de dados
@@ -4254,23 +3852,16 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                                     📍 ${inspection.bairro}, ${inspection.municipio}/${inspection.uf}
                                 </p>
                             </div>
-                            <div style="text-align: right; display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+                            <div style="text-align: right; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
                                 <div style="font-size: 13px; color: #999;">
                                     📅 ${formatDate(inspection.dataVistoria)}<br>
                                     🕐 ${inspection.horaVistoria}
                                 </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <button onclick="generatePDFFromDatabase('${inspection.id}'); event.stopPropagation();" 
-                                            class="btn" 
-                                            style="font-size: 11px; padding: 6px 12px; background: #FF5722; color: white; border: none;">
-                                        📄 PDF
-                                    </button>
-                                    <button onclick="confirmDeleteInspection('${inspection.id}'); event.stopPropagation();" 
-                                            class="btn btn-secondary" 
-                                            style="font-size: 11px; padding: 6px 12px; background: #dc3545; color: white; border: none;">
-                                        🗑️ Deletar
-                                    </button>
-                                </div>
+                                <button onclick="confirmDeleteInspection('${inspection.id}'); event.stopPropagation();" 
+                                        class="btn btn-secondary" 
+                                        style="font-size: 11px; padding: 6px 12px; background: #dc3545; color: white; border: none;">
+                                    🗑️ Deletar
+                                </button>
                             </div>
                         </div>
                         <div style="display: flex; gap: 20px; padding-top: 10px; border-top: 1px solid #f0f0f0; font-size: 13px;" onclick="showInspectionDetails('${inspection.id}')" style="cursor: pointer;">
@@ -4532,8 +4123,9 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
         // Show settings
         function showSettings() {
             hideAllScreens();
-            document.getElementById('settingsScreen').classList.add('active');
-            document.getElementById('settingsScreen').style.display = 'block';
+            const settingsScreen = document.getElementById('settingsScreen');
+            settingsScreen.classList.add('active');
+            settingsScreen.style.display = 'block';
             loadSettings();
             updateConnectionStatus();
             loadStatistics();
