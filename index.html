@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção Residencial - Completo</title>
+    <title>Sistema de Inspeção Residencial - v3.0 (Pasta Pré-Configurada)</title>
     <!-- Google Drive API Scripts -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -938,6 +938,14 @@
                 <p style="color: #666;">Conecte-se com o Google Drive para começar</p>
             </div>
             
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #4CAF50;">
+                <p style="color: #2e7d32; font-size: 13px; margin: 0;">
+                    ✅ <b>Pasta Compartilhada Pré-Configurada!</b><br/>
+                    Todas as suas inspeções serão salvas automaticamente na pasta compartilhada da equipe.<br/>
+                    <strong>Você não precisa configurar nada - está tudo pronto!</strong>
+                </p>
+            </div>
+            
             <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffc107;">
                 <p style="color: #856404; font-size: 13px; margin: 0;">
                     ⚠️ <b>Antes de conectar:</b><br/>
@@ -1134,6 +1142,35 @@
                             <div class="settings-item-title">Última Sincronização</div>
                             <div class="settings-item-desc" id="lastSyncTime">Nunca</div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="settings-group" style="border: 3px solid #4CAF50; background: #e8f5e9;">
+                    <h3 style="color: #2e7d32;">✅ Pasta Centralizada - PRÉ-CONFIGURADA</h3>
+                    <div class="info-card" style="background: white; border-color: #4CAF50;">
+                        <h4 style="color: #2e7d32;">🎉 Tudo Pronto!</h4>
+                        <p style="margin: 5px 0; line-height: 1.8; color: #333;">
+                            <strong>✅ A pasta compartilhada JÁ ESTÁ CONFIGURADA!</strong><br><br>
+                            Todas as inspeções de todos os usuários serão salvas automaticamente na pasta compartilhada abaixo.<br><br>
+                            <strong>📁 Pasta:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">Inspecoes_Residenciais</code><br>
+                            <strong>🔗 Conta:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">brunomachado.bmconsultoria@gmail.com</code><br><br>
+                            <strong>👥 Todos os inspetores</strong> terão acesso às inspeções na mesma pasta!
+                        </p>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #2e7d32;">✅ ID da Pasta (Pré-Configurado):</label>
+                        <input type="text" 
+                               id="sharedFolderId" 
+                               placeholder="ID já configurado automaticamente" 
+                               style="width: 100%; padding: 12px; border: 2px solid #4CAF50; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px;"
+                               readonly>
+                        <p style="font-size: 12px; color: #2e7d32; margin-top: 8px; font-weight: 500;">
+                            ✅ Esta configuração é permanente e não pode ser alterada. Todas as inspeções serão salvas nesta pasta!
+                        </p>
+                    </div>
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="testSharedFolder()">🧪 Testar Acesso à Pasta</button>
+                        <button class="btn btn-success" onclick="openSharedFolder()" style="font-weight: 600;">📂 Abrir Pasta no Drive</button>
                     </div>
                 </div>
 
@@ -1488,6 +1525,33 @@
         const API_KEY = 'AIzaSyDTduz53nKthvO9sR1cvHNmD1DK4IDazlM';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
+        // ⚠️ PASTA COMPARTILHADA CENTRALIZADA - PRÉ-CONFIGURADA ⚠️
+        // ID da pasta já está configurado automaticamente para todos os usuários
+        // TODAS as inspeções serão salvas na pasta compartilhada abaixo
+        
+        let SHARED_FOLDER_ID = '19H2cLVp7KeNs5rCxVh0wQqfxACxNoJHj'; // ✅ PRÉ-CONFIGURADO
+        
+        // Carregar configuração (ID já vem pré-configurado no código)
+        function loadSharedFolderConfig() {
+            console.log('✅ Pasta compartilhada PRÉ-CONFIGURADA:', SHARED_FOLDER_ID);
+            
+            // Preencher o campo na interface com o ID pré-configurado
+            const input = document.getElementById('sharedFolderId');
+            if (input) {
+                input.value = SHARED_FOLDER_ID;
+                input.disabled = true; // Bloquear edição já que está pré-configurado
+                input.style.background = '#e8f5e9'; // Verde claro para indicar configuração ativa
+                input.style.color = '#2e7d32'; // Verde escuro
+                input.style.fontWeight = 'bold';
+            }
+            
+            // Salvar no localStorage se ainda não estiver salvo
+            if (localStorage.getItem('SHARED_FOLDER_ID') !== SHARED_FOLDER_ID) {
+                localStorage.setItem('SHARED_FOLDER_ID', SHARED_FOLDER_ID);
+                console.log('💾 ID da pasta salvo automaticamente no localStorage');
+            }
+        }
+
         // Global variables
         let accessToken = null;
         let tokenClient = null;
@@ -1605,6 +1669,20 @@
             loadInspections();
         }
 
+        // Abrir pasta compartilhada no Google Drive
+        function openSharedFolder() {
+            if (!SHARED_FOLDER_ID) {
+                alert('❌ Nenhuma pasta compartilhada configurada!');
+                return;
+            }
+            
+            const driveUrl = `https://drive.google.com/drive/folders/${SHARED_FOLDER_ID}`;
+            window.open(driveUrl, '_blank');
+            
+            playSound('success');
+            console.log('📂 Abrindo pasta compartilhada:', driveUrl);
+        }
+
         // Load inspections from localStorage
         async function loadInspections() {
             // Tentar carregar do Drive primeiro
@@ -1638,21 +1716,32 @@
             inspections = [];
             
             try {
-                // Buscar pasta raiz
-                const rootFolderName = 'Inspecoes_Residenciais';
-                const rootQuery = `mimeType='application/vnd.google-apps.folder' and name='${rootFolderName}' and trashed=false`;
-                const rootResponse = await gapi.client.drive.files.list({
-                    q: rootQuery,
-                    fields: 'files(id, name)',
-                    spaces: 'drive'
-                });
+                // Determinar pasta raiz
+                let rootFolderId;
+                
+                if (SHARED_FOLDER_ID) {
+                    // Usar pasta compartilhada centralizada
+                    console.log('📁 Usando pasta compartilhada centralizada:', SHARED_FOLDER_ID);
+                    rootFolderId = SHARED_FOLDER_ID;
+                } else {
+                    // Buscar pasta no Drive de quem fez login
+                    console.log('📁 Buscando pasta no Drive pessoal do usuário');
+                    const rootFolderName = 'Inspecoes_Residenciais';
+                    const rootQuery = `mimeType='application/vnd.google-apps.folder' and name='${rootFolderName}' and trashed=false`;
+                    const rootResponse = await gapi.client.drive.files.list({
+                        q: rootQuery,
+                        fields: 'files(id, name)',
+                        spaces: 'drive'
+                    });
 
-                if (!rootResponse.result.files || rootResponse.result.files.length === 0) {
-                    console.log('📭 Nenhuma pasta de inspeções encontrada no Drive');
-                    return;
+                    if (!rootResponse.result.files || rootResponse.result.files.length === 0) {
+                        console.log('📭 Nenhuma pasta de inspeções encontrada no Drive');
+                        return;
+                    }
+
+                    rootFolderId = rootResponse.result.files[0].id;
                 }
-
-                const rootFolderId = rootResponse.result.files[0].id;
+                
                 console.log('📁 Pasta raiz encontrada:', rootFolderId);
 
                 // Buscar pastas de tipo (inicial e completa)
@@ -2680,10 +2769,21 @@
                 throw new Error('Não conectado ao Google Drive');
             }
 
-            // Create folder structure: tipo_inspecao/data/endereco
-            const rootFolderName = 'Inspecoes_Residenciais';
-            const rootFolderId = await findOrCreateFolder(rootFolderName, null);
+            // Determinar pasta raiz
+            let rootFolderId;
+            
+            if (SHARED_FOLDER_ID) {
+                // Usar pasta compartilhada centralizada
+                console.log('📁 Usando pasta compartilhada centralizada:', SHARED_FOLDER_ID);
+                rootFolderId = SHARED_FOLDER_ID;
+            } else {
+                // Criar pasta no Drive de quem fez login
+                console.log('📁 Criando pasta no Drive pessoal do usuário');
+                const rootFolderName = 'Inspecoes_Residenciais';
+                rootFolderId = await findOrCreateFolder(rootFolderName, null);
+            }
 
+            // Create folder structure: tipo_inspecao/data/endereco
             const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
             const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
 
@@ -3493,6 +3593,126 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
             }
         }
 
+        // Salvar configuração de pasta compartilhada
+        function saveSharedFolderConfig() {
+            const folderId = document.getElementById('sharedFolderId').value.trim();
+            
+            if (!folderId) {
+                alert('⚠️ Por favor, insira o ID da pasta compartilhada!');
+                return;
+            }
+            
+            // Validar formato do ID (normalmente tem 33 caracteres alfanuméricos)
+            if (folderId.length < 20) {
+                alert('⚠️ ID inválido! O ID deve ter pelo menos 20 caracteres.\n\nVerifique se copiou corretamente da URL do Drive.');
+                return;
+            }
+            
+            const confirmed = confirm(
+                '⚠️ ATENÇÃO!\n\n' +
+                'Ao salvar esta configuração:\n\n' +
+                '✅ TODAS as inspeções futuras serão salvas nesta pasta compartilhada\n' +
+                '✅ Múltiplos inspetores poderão salvar na mesma pasta\n' +
+                '✅ Você precisará ter permissão de edição na pasta\n\n' +
+                `📁 ID da pasta: ${folderId}\n\n` +
+                'Deseja continuar?'
+            );
+            
+            if (!confirmed) return;
+            
+            // Salvar no localStorage
+            localStorage.setItem('SHARED_FOLDER_ID', folderId);
+            
+            // Atualizar a constante global (recarregar página para aplicar)
+            alert(
+                '✅ Configuração salva com sucesso!\n\n' +
+                '🔄 A página será recarregada para aplicar as mudanças.\n\n' +
+                '📌 Todas as próximas inspeções serão salvas na pasta compartilhada!'
+            );
+            
+            playSound('success');
+            setTimeout(() => window.location.reload(), 1500);
+        }
+
+        // Testar acesso à pasta compartilhada
+        async function testSharedFolder() {
+            const folderId = document.getElementById('sharedFolderId').value.trim();
+            
+            if (!folderId) {
+                alert('⚠️ Por favor, insira o ID da pasta compartilhada primeiro!');
+                return;
+            }
+            
+            if (!accessToken) {
+                alert('❌ Você precisa estar conectado ao Google Drive primeiro!');
+                return;
+            }
+            
+            showProgress('Testando acesso à pasta...');
+            
+            try {
+                // Tentar acessar a pasta
+                const response = await gapi.client.drive.files.get({
+                    fileId: folderId,
+                    fields: 'id, name, mimeType, capabilities'
+                });
+                
+                hideProgress();
+                
+                const folder = response.result;
+                
+                if (folder.mimeType !== 'application/vnd.google-apps.folder') {
+                    alert('❌ ERRO: O ID fornecido não é de uma pasta!\n\nVerifique se copiou o ID correto.');
+                    return;
+                }
+                
+                if (!folder.capabilities || !folder.capabilities.canAddChildren) {
+                    alert(
+                        '⚠️ AVISO: Você não tem permissão de EDIÇÃO nesta pasta!\n\n' +
+                        'Você consegue visualizar a pasta, mas não poderá salvar inspeções.\n\n' +
+                        'Solução:\n' +
+                        '1. Peça ao dono da pasta para dar permissão de EDITOR\n' +
+                        '2. Ou configure "Qualquer pessoa com o link pode editar"'
+                    );
+                    return;
+                }
+                
+                alert(
+                    '✅ SUCESSO!\n\n' +
+                    `📁 Pasta encontrada: "${folder.name}"\n` +
+                    `🔑 ID: ${folder.id}\n` +
+                    `✅ Você tem permissão de edição\n\n` +
+                    'Tudo certo! Você pode salvar esta configuração.'
+                );
+                
+                playSound('success');
+                
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao testar pasta:', error);
+                
+                if (error.status === 404) {
+                    alert(
+                        '❌ PASTA NÃO ENCONTRADA!\n\n' +
+                        'Possíveis causas:\n' +
+                        '1. O ID está incorreto\n' +
+                        '2. A pasta não foi compartilhada com você\n' +
+                        '3. A pasta foi deletada\n\n' +
+                        'Verifique o ID e as permissões.'
+                    );
+                } else if (error.status === 403) {
+                    alert(
+                        '❌ ACESSO NEGADO!\n\n' +
+                        'Você não tem permissão para acessar esta pasta.\n\n' +
+                        'Solução:\n' +
+                        'Configure a pasta como "Qualquer pessoa com o link pode editar"'
+                    );
+                } else {
+                    alert('❌ Erro ao acessar pasta: ' + error.message);
+                }
+            }
+        }
+
         // Statistics
         function loadStatistics() {
             const inspections = JSON.parse(localStorage.getItem('inspections')) || [];
@@ -3787,6 +4007,9 @@ Ao continuar usando, você aceita estes termos.
 
         // Initialize on page load
         window.addEventListener('load', async () => {
+            // Carregar configuração de pasta compartilhada
+            loadSharedFolderConfig();
+            
             // Inicializar Google Drive automaticamente
             console.log('🔄 Inicializando Google Drive...');
             initializeGoogleDrive();
