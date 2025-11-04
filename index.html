@@ -931,6 +931,9 @@
         <div class="header">
             <h1>🏠 Sistema de Inspeção Residencial</h1>
             <p>Gerenciamento Completo de Vistorias</p>
+            <p id="onlineStatus" style="font-size: 12px; margin-top: 5px; opacity: 0.9;">
+                <span id="onlineIndicator">🟢</span> <span id="onlineText">Online</span>
+            </p>
         </div>
 
         <!-- Login Screen -->
@@ -1197,6 +1200,10 @@
                             <div style="font-size: 12px; color: #666;" id="connectionEmail"></div>
                         </div>
                     </div>
+                    
+                    <!-- Container para informações de armazenamento -->
+                    <div id="driveStorageInfo"></div>
+                    
                     <div style="display: flex; gap: 10px;">
                         <button class="btn btn-primary" onclick="reconnectDrive()" id="btnReconnect">🔄 Reconectar</button>
                         <button class="btn btn-secondary" onclick="disconnectDrive()" id="btnDisconnect">🚫 Desconectar</button>
@@ -2411,6 +2418,10 @@
                             <label>Quem Acompanhou *</label>
                             <input type="text" id="acompanhante" value="${baseInspection?.acompanhante || ''}" required>
                         </div>
+                        <div class="form-group">
+                            <label>Telefone de Contato</label>
+                            <input type="tel" id="telefoneAcompanhante" value="${baseInspection?.telefoneAcompanhante || ''}" placeholder="(00) 00000-0000">
+                        </div>
                     </div>
                 </div>
             `;
@@ -2484,7 +2495,8 @@
             // Inspeção Completa: adiciona tomadas e interruptores
             const eletricaItems = [
                 { id: 'quadro', label: 'Estado Quadro de Distribuição' },
-                { id: 'fiacao', label: 'Fiação Aparente' }
+                { id: 'fiacao', label: 'Fiação Aparente' },
+                { id: 'componentes', label: 'Componentes Elétricos' }
             ];
             if (isCompleta) {
                 eletricaItems.push(
@@ -3490,6 +3502,7 @@
                 dataVistoria: document.getElementById('dataVistoria').value,
                 horaVistoria: document.getElementById('horaVistoria').value,
                 acompanhante: document.getElementById('acompanhante').value,
+                telefoneAcompanhante: document.getElementById('telefoneAcompanhante')?.value || '',
                 idadeImovel: document.getElementById('idadeImovel').value,
                 qtdPavimentos: document.getElementById('qtdPavimentos').value,
                 qtdSalas: document.getElementById('qtdSalas').value,
@@ -4087,7 +4100,154 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
         }
 
         function downloadInspectionReport(inspectionId) {
-            alert('Funcionalidade de geração de relatório em desenvolvimento!');
+            // Encontrar a inspeção
+            const inspection = inspections.find(i => i.id === inspectionId);
+            
+            if (!inspection) {
+                alert('❌ Inspeção não encontrada!');
+                return;
+            }
+            
+            // Usar a mesma lógica de downloadPDFReport mas com dados da inspeção
+            if (typeof window.jspdf === 'undefined') {
+                alert('⚠️ Biblioteca jsPDF ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                return;
+            }
+            
+            try {
+                showProgress('Gerando relatório PDF...');
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                let yPos = 20;
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                const margin = 15;
+                
+                const checkPageBreak = (neededSpace = 20) => {
+                    if (yPos + neededSpace > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
+                        return true;
+                    }
+                    return false;
+                };
+                
+                // Título
+                doc.setFontSize(20);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(102, 126, 234);
+                doc.text('RELATÓRIO DE INSPEÇÃO RESIDENCIAL', margin, yPos);
+                yPos += 10;
+                
+                // Tipo
+                doc.setFontSize(14);
+                doc.setTextColor(100, 100, 100);
+                const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
+                doc.text(tipoTexto, margin, yPos);
+                yPos += 15;
+                
+                // Linha
+                doc.setDrawColor(102, 126, 234);
+                doc.setLineWidth(0.5);
+                doc.line(margin, yPos, pageWidth - margin, yPos);
+                yPos += 10;
+                
+                // DADOS
+                doc.setFontSize(14);
+                doc.setTextColor(0, 0, 0);
+                doc.setFont(undefined, 'bold');
+                doc.text('DADOS DO IMÓVEL', margin, yPos);
+                yPos += 8;
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                
+                const dados = [
+                    ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
+                    ['Complemento:', inspection.complemento || 'N/A'],
+                    ['Bairro:', inspection.bairro],
+                    ['Município/UF:', `${inspection.municipio} - ${inspection.uf}`],
+                    ['Data:', inspection.dataVistoria],
+                    ['Hora:', inspection.horaVistoria],
+                    ['Acompanhante:', inspection.acompanhante],
+                    ['Telefone:', inspection.telefoneAcompanhante || 'N/A'],
+                    ['Idade:', `${inspection.idadeImovel} anos`]
+                ];
+                
+                dados.forEach(([label, value]) => {
+                    checkPageBreak();
+                    doc.setFont(undefined, 'bold');
+                    doc.text(label, margin, yPos);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(String(value), margin + 45, yPos);
+                    yPos += 6;
+                });
+                
+                yPos += 10;
+                
+                // PROBLEMAS (simplificado - você já tem a lógica completa em downloadPDFReport)
+                const problemas = [];
+                if (inspection.checklist) {
+                    Object.keys(inspection.checklist).forEach(itemId => {
+                        const item = inspection.checklist[itemId];
+                        if (item.status === 'issue') {
+                            problemas.push({ itemId, item });
+                        }
+                    });
+                }
+                
+                if (problemas.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(220, 53, 69);
+                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Total: ${problemas.length} problema(s) identificado(s)`, margin, yPos);
+                    yPos += 10;
+                } else {
+                    checkPageBreak(20);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
+                    yPos += 10;
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0, 150, 0);
+                    doc.text('✓ Nenhum problema identificado', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                }
+                
+                // Rodapé
+                const totalPages = doc.internal.pages.length - 1;
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
+                    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
+                }
+                
+                // Salvar
+                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.pdf`;
+                doc.save(nomeArquivo);
+                
+                hideProgress();
+                playSound('success');
+                alert('✅ Relatório PDF gerado com sucesso!');
+                
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao gerar PDF:', error);
+                alert('❌ Erro ao gerar PDF: ' + error.message);
+            }
         }
 
         // Confirmar deleção de inspeção
@@ -4324,11 +4484,62 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
                 dot.className = 'status-dot connected';
                 text.textContent = '✅ Conectado ao Google Drive';
                 email.textContent = 'Logado automaticamente via Google';
+                
+                // Buscar informações de armazenamento
+                updateStorageInfo();
             } else {
                 dot.className = 'status-dot disconnected';
                 text.textContent = '❌ Desconectado';
                 email.textContent = 'Clique em Reconectar para autenticar';
             }
+        }
+        
+        // Buscar e exibir informações de armazenamento do Drive
+        async function updateStorageInfo() {
+            if (!accessToken) return;
+            
+            try {
+                const response = await gapi.client.drive.about.get({
+                    fields: 'storageQuota'
+                });
+                
+                const quota = response.result.storageQuota;
+                const usage = parseInt(quota.usage);
+                const limit = parseInt(quota.limit);
+                
+                // Converter para GB
+                const usageGB = (usage / (1024 * 1024 * 1024)).toFixed(2);
+                const limitGB = (limit / (1024 * 1024 * 1024)).toFixed(2);
+                const percentUsed = ((usage / limit) * 100).toFixed(1);
+                
+                // Exibir informações
+                displayStorageBar(usageGB, limitGB, percentUsed);
+            } catch (error) {
+                console.error('Erro ao buscar informações de armazenamento:', error);
+            }
+        }
+        
+        // Exibir barra de armazenamento
+        function displayStorageBar(usageGB, limitGB, percentUsed) {
+            const storageContainer = document.getElementById('driveStorageInfo');
+            if (!storageContainer) return;
+            
+            const barColor = percentUsed > 90 ? '#f44336' : percentUsed > 75 ? '#FF9800' : '#4CAF50';
+            
+            storageContainer.innerHTML = `
+                <div style="margin-top: 15px; padding: 15px; background: #f8f9ff; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+                        <span style="font-weight: 600; color: #333;">💾 Armazenamento do Drive</span>
+                        <span style="color: #666;">${usageGB} GB / ${limitGB} GB (${percentUsed}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 12px; background: #e0e0e0; border-radius: 6px; overflow: hidden;">
+                        <div style="width: ${percentUsed}%; height: 100%; background: ${barColor}; transition: width 0.3s;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; color: #999;">
+                        Espaço disponível: ${(limitGB - usageGB).toFixed(2)} GB
+                    </div>
+                </div>
+            `;
         }
 
         function reconnectDrive() {
@@ -4791,8 +5002,29 @@ Ao continuar usando, você aceita estes termos.
             alert('Funcionalidade de campos personalizados será implementada em breve!');
         }
 
+        // Monitor de conexão online/offline
+        function updateOnlineStatus() {
+            const indicator = document.getElementById('onlineIndicator');
+            const text = document.getElementById('onlineText');
+            
+            if (navigator.onLine) {
+                indicator.textContent = '🟢';
+                text.textContent = 'Online';
+            } else {
+                indicator.textContent = '🔴';
+                text.textContent = 'Offline';
+            }
+        }
+
+        // Eventos de conexão
+        window.addEventListener('online', updateOnlineStatus);
+        window.addEventListener('offline', updateOnlineStatus);
+
         // Initialize on page load
         window.addEventListener('load', async () => {
+            // Atualizar status de conexão
+            updateOnlineStatus();
+            
             // Inicializar sistema de autenticação
             initializeAuthSystem();
             
