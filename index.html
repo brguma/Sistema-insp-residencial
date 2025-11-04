@@ -1824,14 +1824,25 @@
                 return;
             }
 
+            console.log('🔍 DEBUG - Inspeção inicial selecionada:', selectedInitialInspection);
+            console.log('📍 Endereço:', selectedInitialInspection.endereco);
+            console.log('🔢 Número:', selectedInitialInspection.numero);
+            console.log('📊 Checklist:', selectedInitialInspection.checklist);
+            console.log('📸 Fotos:', selectedInitialInspection.photos);
+
+            // IMPORTANTE: Salvar referência ANTES de fechar o modal (que zera a variável)
+            const inspectionData = selectedInitialInspection;
+            
             currentInspectionType = 'completa';
-            closeSelectInitialModal();
-            createInspectionForm('completa', selectedInitialInspection);
+            closeSelectInitialModal(); // Isso zera selectedInitialInspection
+            
+            // Usar a cópia salva
+            createInspectionForm('completa', inspectionData);
         }
 
         function closeSelectInitialModal() {
             document.getElementById('selectInitialModal').classList.remove('active');
-            selectedInitialInspection = null;
+            selectedInitialInspection = null; // ← Aqui estava o problema!
         }
 
         // Format date
@@ -1842,6 +1853,25 @@
 
         // Create inspection form
         function createInspectionForm(type, baseInspection) {
+            console.log('🏗️ Criando formulário de inspeção...');
+            console.log('📋 Tipo:', type);
+            console.log('📦 BaseInspection recebida:', baseInspection);
+            
+            if (baseInspection) {
+                console.log('✅ Dados da baseInspection:');
+                console.log('  - ID:', baseInspection.id);
+                console.log('  - Endereço:', baseInspection.endereco);
+                console.log('  - Número:', baseInspection.numero);
+                console.log('  - Bairro:', baseInspection.bairro);
+                console.log('  - Município:', baseInspection.municipio);
+                console.log('  - UF:', baseInspection.uf);
+                console.log('  - Acompanhante:', baseInspection.acompanhante);
+                console.log('  - Quartos:', baseInspection.qtdQuartos);
+                console.log('  - Suítes:', baseInspection.qtdSuites);
+            } else {
+                console.log('⚠️ BaseInspection é NULL ou UNDEFINED');
+            }
+            
             const formContainer = document.getElementById('inspectionForm');
             const isCompleta = type === 'completa';
             const badge = isCompleta ? 
