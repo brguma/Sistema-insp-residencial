@@ -4228,7 +4228,6 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 // =====================================================
                 // SEÇÃO 1: FOTOS GERAIS DO IMÓVEL (VINDO PRIMEIRO!)
                 // =====================================================
-                const maxWidth = pageWidth - (2 * margin);
                 const fotosGerais = [];
                 if (inspection.photos) {
                     Object.keys(inspection.photos).forEach(key => {
@@ -4305,7 +4304,6 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 // =====================================================
                 
                 // PROBLEMAS ENCONTRADOS (COMPLETO COM FOTOS E OBSERVAÇÕES)
-                const maxWidth = pageWidth - (2 * margin);
                 const problemasEncontrados = [];
                 
                 if (inspection.checklist) {
