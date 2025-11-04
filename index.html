@@ -1606,10 +1606,146 @@
         }
 
         // Load inspections from localStorage
-        function loadInspections() {
+        async function loadInspections() {
+            // Tentar carregar do Drive primeiro
+            if (accessToken) {
+                try {
+                    showProgress('Carregando inspeções do Google Drive...');
+                    await loadInspectionsFromDrive();
+                    hideProgress();
+                    console.log('✅ Inspeções carregadas do Drive:', inspections.length);
+                    return;
+                } catch (error) {
+                    console.error('❌ Erro ao carregar do Drive:', error);
+                    hideProgress();
+                }
+            }
+            
+            // Fallback: carregar do localStorage
             const stored = localStorage.getItem('inspections');
             if (stored) {
                 inspections = JSON.parse(stored);
+                console.log('📦 Inspeções carregadas do localStorage:', inspections.length);
+            }
+        }
+
+        // Carregar inspeções do Google Drive
+        async function loadInspectionsFromDrive() {
+            if (!accessToken) {
+                throw new Error('Não conectado ao Google Drive');
+            }
+
+            inspections = [];
+            
+            try {
+                // Buscar pasta raiz
+                const rootFolderName = 'Inspecoes_Residenciais';
+                const rootQuery = `mimeType='application/vnd.google-apps.folder' and name='${rootFolderName}' and trashed=false`;
+                const rootResponse = await gapi.client.drive.files.list({
+                    q: rootQuery,
+                    fields: 'files(id, name)',
+                    spaces: 'drive'
+                });
+
+                if (!rootResponse.result.files || rootResponse.result.files.length === 0) {
+                    console.log('📭 Nenhuma pasta de inspeções encontrada no Drive');
+                    return;
+                }
+
+                const rootFolderId = rootResponse.result.files[0].id;
+                console.log('📁 Pasta raiz encontrada:', rootFolderId);
+
+                // Buscar pastas de tipo (inicial e completa)
+                const typeFolders = await gapi.client.drive.files.list({
+                    q: `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                    fields: 'files(id, name)',
+                    spaces: 'drive'
+                });
+
+                for (const typeFolder of typeFolders.result.files) {
+                    console.log('📂 Processando tipo:', typeFolder.name);
+                    
+                    // Buscar pastas de data
+                    const dateFolders = await gapi.client.drive.files.list({
+                        q: `'${typeFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                        fields: 'files(id, name)',
+                        spaces: 'drive'
+                    });
+
+                    for (const dateFolder of dateFolders.result.files) {
+                        // Buscar pastas de endereço
+                        const addressFolders = await gapi.client.drive.files.list({
+                            q: `'${dateFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                            fields: 'files(id, name)',
+                            spaces: 'drive'
+                        });
+
+                        for (const addressFolder of addressFolders.result.files) {
+                            // Buscar arquivo inspecao.json dentro da pasta
+                            const jsonFiles = await gapi.client.drive.files.list({
+                                q: `'${addressFolder.id}' in parents and name='inspecao.json' and trashed=false`,
+                                fields: 'files(id, name)',
+                                spaces: 'drive'
+                            });
+
+                            if (jsonFiles.result.files && jsonFiles.result.files.length > 0) {
+                                const fileId = jsonFiles.result.files[0].id;
+                                
+                                // Baixar conteúdo do arquivo
+                                const response = await gapi.client.drive.files.get({
+                                    fileId: fileId,
+                                    alt: 'media'
+                                });
+
+                                const inspection = JSON.parse(response.body);
+                                inspection.driveFileId = fileId;
+                                inspection.driveFolderId = addressFolder.id;
+                                inspections.push(inspection);
+                                console.log('  ✅ Inspeção carregada:', inspection.endereco, inspection.numero);
+                            }
+                        }
+                    }
+                }
+
+                console.log(`✅ Total de ${inspections.length} inspeções carregadas do Drive`);
+                
+                // Sincronizar com localStorage também
+                localStorage.setItem('inspections', JSON.stringify(inspections));
+                
+            } catch (error) {
+                console.error('❌ Erro ao buscar inspeções do Drive:', error);
+                throw error;
+            }
+        }
+
+        // Deletar inspeção do Google Drive
+        async function deleteInspectionFromDrive(inspection) {
+            if (!accessToken) {
+                throw new Error('Não conectado ao Google Drive');
+            }
+
+            if (!inspection.driveFolderId) {
+                throw new Error('ID da pasta no Drive não encontrado');
+            }
+
+            try {
+                // Deletar a pasta inteira (que contém o JSON, relatório e fotos)
+                await gapi.client.drive.files.delete({
+                    fileId: inspection.driveFolderId
+                });
+
+                console.log('✅ Pasta deletada do Drive:', inspection.driveFolderId);
+                
+                // Remover do array local
+                const index = inspections.findIndex(i => i.id === inspection.id);
+                if (index > -1) {
+                    inspections.splice(index, 1);
+                    localStorage.setItem('inspections', JSON.stringify(inspections));
+                }
+                
+            } catch (error) {
+                console.error('❌ Erro ao deletar do Drive:', error);
+                throw error;
             }
         }
 
@@ -1638,11 +1774,16 @@
         }
 
         // Show list of initial inspections
-        function showInitialInspectionsList() {
+        async function showInitialInspectionsList() {
+            // Carregar inspeções do Drive primeiro
+            showProgress('Carregando inspeções do Google Drive...');
+            await loadInspections();
+            hideProgress();
+            
             const initialInspections = inspections.filter(i => i.type === 'inicial');
             
             if (initialInspections.length === 0) {
-                alert('Não há inspeções iniciais cadastradas. Por favor, realize uma inspeção inicial primeiro.');
+                alert('Não há inspeções iniciais cadastradas no Google Drive. Por favor, realize uma inspeção inicial primeiro.');
                 return;
             }
 
@@ -2791,7 +2932,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
         }
 
         // Show inspections list (placeholder)
-        function showInspectionsList() {
+        async function showInspectionsList() {
             // Ocultar outras telas
             document.getElementById('mainMenu').classList.remove('active');
             document.getElementById('inspectionForm').classList.remove('active');
@@ -2800,7 +2941,8 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             const dbScreen = document.getElementById('inspectionsDatabase');
             dbScreen.style.display = 'block';
             
-            // Carregar dados
+            // Carregar dados do Drive
+            await loadInspections();
             loadDatabaseView();
         }
 
@@ -2863,12 +3005,11 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 const photos = countPhotos(inspection);
                 
                 html += `
-                    <div class="inspection-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; cursor: pointer; transition: all 0.3s;" 
-                         onclick="showInspectionDetails('${inspection.id}')"
+                    <div class="inspection-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; transition: all 0.3s;" 
                          onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
                          onmouseout="this.style.boxShadow='none'">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                            <div>
+                            <div onclick="showInspectionDetails('${inspection.id}')" style="cursor: pointer; flex: 1;">
                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
                                     <h4 style="margin: 0; color: #333;">${inspection.endereco}, ${inspection.numero}</h4>
                                     ${typeBadge}
@@ -2877,12 +3018,19 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                                     📍 ${inspection.bairro}, ${inspection.municipio}/${inspection.uf}
                                 </p>
                             </div>
-                            <div style="text-align: right; font-size: 13px; color: #999;">
-                                📅 ${formatDate(inspection.dataVistoria)}<br>
-                                🕐 ${inspection.horaVistoria}
+                            <div style="text-align: right; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+                                <div style="font-size: 13px; color: #999;">
+                                    📅 ${formatDate(inspection.dataVistoria)}<br>
+                                    🕐 ${inspection.horaVistoria}
+                                </div>
+                                <button onclick="confirmDeleteInspection('${inspection.id}'); event.stopPropagation();" 
+                                        class="btn btn-secondary" 
+                                        style="font-size: 11px; padding: 6px 12px; background: #dc3545; color: white; border: none;">
+                                    🗑️ Deletar
+                                </button>
                             </div>
                         </div>
-                        <div style="display: flex; gap: 20px; padding-top: 10px; border-top: 1px solid #f0f0f0; font-size: 13px;">
+                        <div style="display: flex; gap: 20px; padding-top: 10px; border-top: 1px solid #f0f0f0; font-size: 13px;" onclick="showInspectionDetails('${inspection.id}')" style="cursor: pointer;">
                             <div style="color: ${problems > 0 ? '#f44336' : '#4caf50'};">
                                 ⚠️ ${problems} problema${problems !== 1 ? 's' : ''}
                             </div>
@@ -3026,6 +3174,58 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
 
         function downloadInspectionReport(inspectionId) {
             alert('Funcionalidade de geração de relatório em desenvolvimento!');
+        }
+
+        // Confirmar deleção de inspeção
+        async function confirmDeleteInspection(inspectionId) {
+            const inspection = inspections.find(i => i.id === inspectionId);
+            if (!inspection) {
+                alert('Inspeção não encontrada!');
+                return;
+            }
+
+            const message = `
+⚠️ ATENÇÃO - ESTA AÇÃO NÃO PODE SER DESFEITA! ⚠️
+
+Você está prestes a DELETAR PERMANENTEMENTE esta inspeção:
+
+📍 ${inspection.endereco}, ${inspection.numero}
+📅 ${formatDate(inspection.dataVistoria)} às ${inspection.horaVistoria}
+${inspection.type === 'inicial' ? '🏁 INSPEÇÃO INICIAL' : '📊 INSPEÇÃO COMPLETA'}
+
+⚠️ TODOS OS DADOS SERÃO PERDIDOS:
+• Informações do imóvel
+• Observações de problemas
+• TODAS AS FOTOS
+• Relatórios gerados
+
+❌ ESTA AÇÃO NÃO PODE SER RECUPERADA! ❌
+
+Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
+
+            const confirmation = prompt(message);
+            
+            if (confirmation === 'DELETAR') {
+                try {
+                    showProgress('Deletando inspeção do Google Drive...');
+                    await deleteInspectionFromDrive(inspection);
+                    hideProgress();
+                    
+                    alert('✅ Inspeção deletada com sucesso!');
+                    playSound('success');
+                    
+                    // Recarregar a lista
+                    await loadInspections();
+                    loadDatabaseView();
+                    
+                } catch (error) {
+                    hideProgress();
+                    console.error('❌ Erro ao deletar:', error);
+                    alert('❌ Erro ao deletar inspeção: ' + error.message);
+                }
+            } else if (confirmation !== null) {
+                alert('❌ Texto de confirmação incorreto. A inspeção NÃO foi deletada.');
+            }
         }
 
         // ========================================================================
@@ -3556,15 +3756,18 @@ Ao continuar usando, você aceita estes termos.
         }
 
         // Initialize on page load
-        window.addEventListener('load', () => {
-            loadInspections();
-            
+        window.addEventListener('load', async () => {
             // Inicializar Google Drive automaticamente
             console.log('🔄 Inicializando Google Drive...');
             initializeGoogleDrive();
             
             // Load user settings
             loadSettings();
+            
+            // Nota: loadInspections() será chamado quando necessário:
+            // - Ao abrir o banco de dados
+            // - Ao selecionar inspeção completa
+            // Isso evita tentar carregar do Drive antes de estar conectado
         });
     </script>
 </body>
