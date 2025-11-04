@@ -1680,10 +1680,6 @@
                 // Ocultar tela de login
                 document.getElementById('loginScreen').classList.remove('active');
                 
-                // Conectar automaticamente ao Google Drive
-                showProgress('Conectando ao Google Drive...');
-                initializeGoogleDrive();
-                
                 // Atualizar interface
                 document.getElementById('currentUserDisplay').textContent = user.name;
                 
@@ -1691,6 +1687,30 @@
                 if (user.isAdmin) {
                     document.getElementById('adminMenuButton').style.display = 'block';
                 }
+                
+                // Conectar ao Google Drive
+                showProgress('Conectando ao Google Drive...');
+                
+                // Aguardar inicialização das APIs e então solicitar autorização
+                const waitForInitAndConnect = setInterval(() => {
+                    if (gapiInited && gisInited) {
+                        clearInterval(waitForInitAndConnect);
+                        hideProgress();
+                        
+                        // Agora solicitar autorização do Google
+                        console.log('✅ APIs inicializadas. Solicitando autorização...');
+                        requestAccessToken();
+                    }
+                }, 100);
+                
+                // Timeout de segurança (10 segundos)
+                setTimeout(() => {
+                    clearInterval(waitForInitAndConnect);
+                    if (!gapiInited || !gisInited) {
+                        hideProgress();
+                        alert('⚠️ Timeout ao inicializar APIs do Google.\n\nTente recarregar a página (F5) e fazer login novamente.');
+                    }
+                }, 10000);
                 
                 playSound('success');
             } else {
@@ -4692,6 +4712,13 @@ Ao continuar usando, você aceita estes termos.
             // Carregar configuração de pasta compartilhada
             loadSharedFolderConfig();
             
+            // Load user settings
+            loadSettings();
+            
+            // SEMPRE inicializar Google Drive API (necessário para carregar bibliotecas)
+            console.log('🔄 Inicializando APIs do Google Drive...');
+            initializeGoogleDrive();
+            
             // Verificar se há usuário logado
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
@@ -4699,7 +4726,7 @@ Ao continuar usando, você aceita estes termos.
                     currentUser = JSON.parse(savedUser);
                     console.log('✅ Sessão ativa encontrada:', currentUser.name);
                     
-                    // Ocultar tela de login e conectar ao Drive
+                    // Ocultar tela de login
                     document.getElementById('loginScreen').classList.remove('active');
                     
                     // Atualizar interface
@@ -4708,9 +4735,37 @@ Ao continuar usando, você aceita estes termos.
                         document.getElementById('adminMenuButton').style.display = 'block';
                     }
                     
-                    // Inicializar Google Drive automaticamente
-                    console.log('🔄 Conectando ao Google Drive...');
-                    initializeGoogleDrive();
+                    // Aguardar APIs carregarem e solicitar autorização automaticamente
+                    showProgress('Conectando ao Google Drive...');
+                    
+                    const waitForInitAndConnect = setInterval(() => {
+                        if (gapiInited && gisInited) {
+                            clearInterval(waitForInitAndConnect);
+                            hideProgress();
+                            
+                            // Verificar se já tem accessToken válido
+                            if (accessToken) {
+                                console.log('✅ Token existente encontrado, conectando ao Drive...');
+                                showMainMenu();
+                            } else {
+                                console.log('🔐 Solicitando autorização do Google...');
+                                requestAccessToken();
+                            }
+                        }
+                    }, 100);
+                    
+                    // Timeout de segurança
+                    setTimeout(() => {
+                        clearInterval(waitForInitAndConnect);
+                        if (!gapiInited || !gisInited) {
+                            hideProgress();
+                            alert('⚠️ Erro ao carregar APIs do Google.\n\nRecarregue a página (F5) e tente novamente.');
+                            // Fazer logout para forçar novo login
+                            localStorage.removeItem('currentUser');
+                            window.location.reload();
+                        }
+                    }, 10000);
+                    
                 } catch (e) {
                     console.error('Erro ao restaurar sessão:', e);
                     localStorage.removeItem('currentUser');
@@ -4718,9 +4773,6 @@ Ao continuar usando, você aceita estes termos.
             } else {
                 console.log('🔐 Nenhuma sessão ativa. Aguardando login...');
             }
-            
-            // Load user settings
-            loadSettings();
         });
     </script>
 </body>
