@@ -3108,13 +3108,93 @@
                 
                 yPos += 10;
                 
+                // =====================================================
+                // SEÇÃO 1: FOTOS GERAIS DO IMÓVEL (VINDO PRIMEIRO!)
+                // =====================================================
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(102, 126, 234);
+                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            checkPageBreak(25);
+                            
+                            doc.setFontSize(11);
+                            doc.setFont(undefined, 'bold');
+                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
+                            yPos += 6;
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
+                                        fotoGeral.fotos[i].data : fotoGeral.fotos[i];
+                                    
+                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto geral ao PDF:', error);
+                                    doc.setFontSize(9);
+                                    doc.setTextColor(200, 0, 0);
+                                    doc.text(`[Erro ao carregar foto ${i + 1}]`, margin + 10, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    yPos += 6;
+                                }
+                            }
+                            
+                            yPos += 5;
+                        }
+                    }
+                    
+                    yPos += 10;
+                }
+                
+                // =====================================================
+                // SEÇÃO 2: PROBLEMAS ENCONTRADOS (VINDO DEPOIS!)
+                // =====================================================
+                
                 // PROBLEMAS ENCONTRADOS
                 const problemasEncontrados = [];
                 
                 if (inspection.checklist) {
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
-                        if (item.status === 'issue') {
+                        
+                        // FILTRAR: Ignorar IDs inválidos (alertas, sistema, etc)
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -3258,72 +3338,6 @@
                     yPos += 10;
                 }
                 
-                // FOTOS GERAIS
-                const fotosGerais = [];
-                if (inspection.photos) {
-                    Object.keys(inspection.photos).forEach(key => {
-                        if (key.startsWith('fotos_')) {
-                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
-                            fotosGerais.push({
-                                key: key,
-                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
-                                fotos: inspection.photos[key]
-                            });
-                        }
-                    });
-                }
-                
-                if (fotosGerais.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(102, 126, 234);
-                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                    
-                    for (const fotoGeral of fotosGerais) {
-                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
-                            checkPageBreak(25);
-                            
-                            doc.setFontSize(11);
-                            doc.setFont(undefined, 'bold');
-                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
-                            yPos += 6;
-                            
-                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
-                                checkPageBreak(90);
-                                
-                                try {
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
-                                    // CORREÇÃO: Usar foto.data se for objeto, ou foto diretamente se for string
-                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? fotoGeral.fotos[i].data : fotoGeral.fotos[i];
-                                    
-                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                    
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`${fotoGeral.nome} - Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
-                                    
-                                    yPos += imgHeight + 10;
-                                } catch (error) {
-                                    console.error('❌ Erro ao adicionar foto geral:', error);
-                                    console.error('📷 Dados da foto:', fotoGeral.fotos[i]);
-                                    console.error('📋 Tipo:', typeof fotoGeral.fotos[i]);
-                                }
-                            }
-                            
-                            yPos += 5;
-                        }
-                    }
-                }
-                
                 // Rodapé em todas as páginas
                 const totalPages = doc.internal.pages.length - 1;
                 for (let i = 1; i <= totalPages; i++) {
@@ -3372,6 +3386,30 @@
             }
             
             return 'Outros';
+        }
+        
+        // Função auxiliar para verificar se um itemId é válido (não é um ID de sistema/alerta)
+        function isValidInspectionItem(itemId) {
+            // Ignorar IDs de sistema/alertas que não são problemas reais
+            const invalidPrefixes = ['alert', 'system', 'notification', 'outros', 'undefined', 'null'];
+            const itemLower = itemId.toLowerCase();
+            
+            // Retornar falso se começar com algum prefixo inválido
+            for (const prefix of invalidPrefixes) {
+                if (itemLower.startsWith(prefix)) {
+                    return false;
+                }
+            }
+            
+            // Verificar se é um ID válido de categoria conhecida
+            const validPrefixes = ['paredes', 'teto', 'piso', 'portas', 'eletrica', 'hidraulica', 'banheiro', 'cozinha', 'telhado', 'estrutura', 'fotos'];
+            for (const prefix of validPrefixes) {
+                if (itemId.startsWith(prefix)) {
+                    return true;
+                }
+            }
+            
+            return false; // Se não for reconhecido, ignorar
         }
         
         function getItemNameFromId(itemId) {
@@ -4187,6 +4225,85 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 
                 yPos += 10;
                 
+                // =====================================================
+                // SEÇÃO 1: FOTOS GERAIS DO IMÓVEL (VINDO PRIMEIRO!)
+                // =====================================================
+                const maxWidth = pageWidth - (2 * margin);
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(102, 126, 234);
+                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            checkPageBreak(25);
+                            
+                            doc.setFontSize(11);
+                            doc.setFont(undefined, 'bold');
+                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
+                            yPos += 6;
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
+                                        fotoGeral.fotos[i].data : fotoGeral.fotos[i];
+                                    
+                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto geral ao PDF:', error);
+                                    doc.setFontSize(9);
+                                    doc.setTextColor(200, 0, 0);
+                                    doc.text(`[Erro ao carregar foto ${i + 1}]`, margin + 10, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    yPos += 6;
+                                }
+                            }
+                            
+                            yPos += 5;
+                        }
+                    }
+                    
+                    yPos += 10;
+                }
+                
+                // =====================================================
+                // SEÇÃO 2: PROBLEMAS ENCONTRADOS (VINDO DEPOIS!)
+                // =====================================================
+                
                 // PROBLEMAS ENCONTRADOS (COMPLETO COM FOTOS E OBSERVAÇÕES)
                 const maxWidth = pageWidth - (2 * margin);
                 const problemasEncontrados = [];
@@ -4194,7 +4311,9 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 if (inspection.checklist) {
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
-                        if (item.status === 'issue') {
+                        
+                        // FILTRAR: Ignorar IDs inválidos (alertas, sistema, etc)
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -4336,76 +4455,6 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
                     doc.setTextColor(0, 0, 0);
                     yPos += 10;
-                }
-                
-                // FOTOS GERAIS
-                const fotosGerais = [];
-                if (inspection.photos) {
-                    Object.keys(inspection.photos).forEach(key => {
-                        if (key.startsWith('fotos_')) {
-                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
-                            fotosGerais.push({
-                                key: key,
-                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
-                                fotos: inspection.photos[key]
-                            });
-                        }
-                    });
-                }
-                
-                if (fotosGerais.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(102, 126, 234);
-                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                    
-                    for (const fotoGeral of fotosGerais) {
-                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
-                            checkPageBreak(25);
-                            
-                            doc.setFontSize(11);
-                            doc.setFont(undefined, 'bold');
-                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
-                            yPos += 6;
-                            
-                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
-                                checkPageBreak(90);
-                                
-                                try {
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
-                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
-                                        fotoGeral.fotos[i].data : fotoGeral.fotos[i];
-                                    
-                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                    
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
-                                    
-                                    yPos += imgHeight + 10;
-                                } catch (error) {
-                                    console.error('❌ Erro ao adicionar foto geral ao PDF:', error);
-                                    doc.setFontSize(9);
-                                    doc.setTextColor(200, 0, 0);
-                                    doc.text(`[Erro ao carregar foto ${i + 1}]`, margin + 10, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    yPos += 6;
-                                }
-                            }
-                            
-                            yPos += 5;
-                        }
-                    }
                 }
                 
                 // Rodapé
