@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção Residencial - v3.0 (Pasta Pré-Configurada)</title>
+    <title>Sistema de Inspeção Residencial - v3.2 (Drive + PDF)</title>
     <!-- Google Drive API Scripts -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -933,10 +933,100 @@
             <p>Gerenciamento Completo de Vistorias</p>
         </div>
 
-        <!-- Tela de boas-vindas removida - inicia direto no menu -->
+        <!-- Login Screen -->
+        <div id="loginScreen" class="login-screen active">
+            <div style="margin-bottom: 30px;">
+                <h2 style="color: #333; margin-bottom: 10px;">🏠 Sistema de Inspeção Residencial</h2>
+                <p style="color: #666;">Faça login para acessar o sistema</p>
+            </div>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #4CAF50;">
+                <p style="color: #2e7d32; font-size: 13px; margin: 0; text-align: center;">
+                    ✅ <b>Sistema Sincronizado com Google Drive</b><br/>
+                    Todas as inspeções são salvas automaticamente na nuvem
+                </p>
+            </div>
+            
+            <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Usuário:</label>
+                    <input type="text" id="loginUsername" placeholder="Digite seu usuário" 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                           onkeypress="if(event.key==='Enter') document.getElementById('loginPassword').focus()">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Senha:</label>
+                    <input type="password" id="loginPassword" placeholder="Digite sua senha" 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;"
+                           onkeypress="if(event.key==='Enter') attemptLogin()">
+                </div>
+                
+                <button onclick="attemptLogin()" 
+                        style="width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s;"
+                        onmouseover="this.style.transform='translateY(-2px)'" 
+                        onmouseout="this.style.transform='translateY(0)'">
+                    🔐 Entrar no Sistema
+                </button>
+            </div>
+            
+            <p style="margin-top: 20px; color: #999; font-size: 12px; text-align: center;">
+                Acesso restrito • Usuários autorizados apenas
+            </p>
+        </div>
+
+        <!-- Admin Panel (User Management) -->
+        <div id="adminPanel" class="settings-screen" style="display: none;">
+            <div class="settings-header">
+                <h2>👤 Gerenciar Usuários</h2>
+                <button class="btn btn-secondary" onclick="closeAdminPanel()">← Voltar</button>
+            </div>
+            
+            <div style="padding: 30px;">
+                <!-- Add New User -->
+                <div class="form-section" style="background: #f8f9fa; padding: 25px; border-radius: 10px; margin-bottom: 30px;">
+                    <h3 style="margin-bottom: 20px; color: #667eea;">➕ Adicionar Novo Usuário</h3>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nome Completo:</label>
+                        <input type="text" id="newUserName" placeholder="Ex: João Silva" 
+                               style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Usuário:</label>
+                        <input type="text" id="newUserUsername" placeholder="Ex: joao.silva" 
+                               style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600;">Senha:</label>
+                        <input type="password" id="newUserPassword" placeholder="Mínimo 4 caracteres" 
+                               style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px;">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="newUserIsAdmin" style="margin-right: 10px; width: 18px; height: 18px;">
+                            <span style="font-weight: 600;">Administrador (pode gerenciar usuários)</span>
+                        </label>
+                    </div>
+                    
+                    <button onclick="addNewUser()" class="btn btn-success" style="font-size: 16px; padding: 12px 30px;">
+                        ✅ Adicionar Usuário
+                    </button>
+                </div>
+                
+                <!-- Users List -->
+                <div class="form-section">
+                    <h3 style="margin-bottom: 20px; color: #667eea;">📋 Usuários Cadastrados</h3>
+                    <div id="usersList"></div>
+                </div>
+            </div>
+        </div>
 
         <!-- Main Menu -->
-        <div id="mainMenu" class="main-menu active">
+        <div id="mainMenu" class="main-menu">
             <div class="menu-grid">
                 <div class="menu-card" onclick="showInspectionTypeModal()">
                     <i>📋</i>
@@ -953,6 +1043,21 @@
                     <h3>Configurações</h3>
                     <p>Ajustes do sistema</p>
                 </div>
+                <div id="adminMenuButton" class="menu-card" onclick="showAdminPanel()" style="display: none;">
+                    <i>👤</i>
+                    <h3>Gerenciar Usuários</h3>
+                    <p>Adicionar/remover usuários</p>
+                </div>
+            </div>
+            
+            <!-- User Info -->
+            <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+                <p style="margin: 0; color: #666; font-size: 14px;">
+                    👤 Logado como: <strong id="currentUserDisplay"></strong>
+                </p>
+                <button onclick="logout()" class="btn btn-secondary" style="margin-top: 10px; font-size: 14px; padding: 8px 20px;">
+                    🚪 Sair
+                </button>
             </div>
         </div>
 
@@ -1083,49 +1188,97 @@
 
             <!-- Google Drive Tab -->
             <div id="tab-drive" class="settings-content active">
-                <div class="settings-group" style="border: 3px solid #2196F3; background: #e3f2fd;">
-                    <h3 style="color: #1976d2;">ℹ️ Armazenamento Local</h3>
-                    <div class="info-card" style="background: white; border-color: #2196F3;">
-                        <h4 style="color: #1976d2;">💾 Como Funciona</h4>
-                        <p style="margin: 5px 0; line-height: 1.8; color: #333;">
-                            <strong>📝 Salvamento Local:</strong><br>
-                            Todas as inspeções são salvas automaticamente no navegador (localStorage).<br><br>
-                            <strong>📄 Relatório PDF:</strong><br>
-                            Use o botão "📄 Baixar Relatório PDF" para gerar um documento completo com todas as fotos e observações.<br><br>
-                            <strong>⚠️ Atenção:</strong><br>
-                            Limpar os dados do navegador apagará as inspeções. Faça backup regular usando a exportação de dados!
-                        </p>
+                <div class="settings-group">
+                    <h3>Status da Conexão</h3>
+                    <div class="connection-status">
+                        <div class="status-dot" id="connectionDot"></div>
+                        <div>
+                            <div style="font-weight: 500;" id="connectionText">Verificando...</div>
+                            <div style="font-size: 12px; color: #666;" id="connectionEmail"></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="reconnectDrive()" id="btnReconnect">🔄 Reconectar</button>
+                        <button class="btn btn-secondary" onclick="disconnectDrive()" id="btnDisconnect">🚫 Desconectar</button>
+                        <button class="btn btn-success" onclick="openDriveFolder()">📁 Ver Pasta</button>
                     </div>
                 </div>
 
-                <div class="settings-group" style="border: 3px solid #4CAF50; background: #e8f5e9;">
-                    <h3 style="color: #2e7d32;">✅ Pasta Compartilhada - Referência</h3>
-                    <div class="info-card" style="background: white; border-color: #4CAF50;">
-                        <h4 style="color: #2e7d32;">📂 Pasta da Equipe</h4>
+                <div class="settings-group">
+                    <h3>Sincronização</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <div class="settings-item-title">Sincronizar Agora</div>
+                            <div class="settings-item-desc">Forçar upload manual de todas as inspeções</div>
+                        </div>
+                        <div class="settings-item-control">
+                            <button class="btn btn-primary" onclick="syncWithDrive()">↻ Sincronizar</button>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <div class="settings-item-title">Última Sincronização</div>
+                            <div class="settings-item-desc" id="lastSyncTime">Nunca</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group" style="border: 3px solid #FF9800; background: #fff3cd;">
+                    <h3 style="color: #FF9800;">🎯 Pasta Centralizada (Recomendado)</h3>
+                    <div class="info-card" style="background: white; border-color: #FF9800;">
+                        <h4 style="color: #FF9800;">📌 Como Configurar:</h4>
                         <p style="margin: 5px 0; line-height: 1.8; color: #333;">
-                            A pasta compartilhada está disponível para toda a equipe:<br><br>
-                            <strong>📁 Pasta:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">Inspecoes_Residenciais</code><br>
-                            <strong>🔗 Conta:</strong> <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">brunomachado.bmconsultoria@gmail.com</code><br><br>
-                            <strong>💡 Dica:</strong> Após gerar o PDF, você pode fazer upload manual para a pasta compartilhada se desejar.
+                            <strong>1.</strong> Acesse o Drive do <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">brunomachado.bmconsultoria@gmail.com</code><br>
+                            <strong>2.</strong> Crie uma pasta (ex: "Inspeções BM Consultoria")<br>
+                            <strong>3.</strong> Clique com botão direito → <strong>Compartilhar</strong><br>
+                            <strong>4.</strong> Configure: <strong>"Qualquer pessoa com o link pode editar"</strong><br>
+                            <strong>5.</strong> Abra a pasta no navegador<br>
+                            <strong>6.</strong> Copie o ID da URL: <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">https://drive.google.com/drive/folders/<span style="color: #FF9800; font-weight: bold;">ID_AQUI</span></code><br>
+                            <strong>7.</strong> Cole abaixo e clique em Salvar
                         </p>
                     </div>
                     <div style="margin-top: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #2e7d32;">✅ ID da Pasta:</label>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #FF9800;">ID da Pasta Compartilhada:</label>
                         <input type="text" 
                                id="sharedFolderId" 
-                               placeholder="ID da pasta compartilhada" 
-                               style="width: 100%; padding: 12px; border: 2px solid #4CAF50; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px;"
-                               readonly>
+                               placeholder="Cole o ID da pasta aqui (ex: 1a2b3c4d5e6f7g8h9i0j)" 
+                               style="width: 100%; padding: 12px; border: 2px solid #FF9800; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 13px;">
+                        <p style="font-size: 12px; color: #856404; margin-top: 8px; font-weight: 500;">
+                            ⚠️ Se configurado, TODAS as inspeções de TODOS os inspetores serão salvas nesta pasta compartilhada!
+                        </p>
                     </div>
-                    <div style="margin-top: 15px;">
-                        <button class="btn btn-success" onclick="openSharedFolder()" style="font-weight: 600;">📂 Abrir Pasta no Drive</button>
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-success" onclick="saveSharedFolderConfig()" style="font-weight: 600;">💾 Salvar Configuração</button>
+                        <button class="btn btn-secondary" onclick="testSharedFolder()">🧪 Testar Acesso à Pasta</button>
                     </div>
                 </div>
+
+                <div class="settings-group">
+                    <h3>Configuração de Pastas</h3>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <div class="settings-item-title">Pasta Raiz</div>
+                            <div class="settings-item-desc">Nome da pasta principal no Drive</div>
+                        </div>
+                        <div class="settings-item-control">
+                            <input type="text" class="settings-input" id="folderRootName" value="Inspecoes_Residenciais">
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <div class="settings-item-info">
+                            <div class="settings-item-title">Estrutura de Pastas</div>
+                            <div class="settings-item-desc">Como organizar as pastas</div>
+                        </div>
+                        <div class="settings-item-control">
+                            <select class="settings-select" id="folderStructure">
+                                <option value="tipo-data-endereco">Tipo → Data → Endereço</option>
+                                <option value="data-tipo-endereco">Data → Tipo → Endereço</option>
+                                <option value="endereco-data">Endereço → Data</option>
                             </select>
                         </div>
                     </div>
                     <div style="margin-top: 15px;">
-                        <button class="btn btn-success" onclick="openSharedFolder()" style="font-weight: 600;">📂 Abrir Pasta no Drive</button>
+                        <button class="btn btn-success" onclick="saveSettings()">💾 Salvar Configurações</button>
                     </div>
                 </div>
             </div>
@@ -1451,30 +1604,22 @@
         const API_KEY = 'AIzaSyDTduz53nKthvO9sR1cvHNmD1DK4IDazlM';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
-        // ⚠️ PASTA COMPARTILHADA CENTRALIZADA - PRÉ-CONFIGURADA ⚠️
-        // ID da pasta já está configurado automaticamente para todos os usuários
-        // TODAS as inspeções serão salvas na pasta compartilhada abaixo
+        // ⚠️ PASTA COMPARTILHADA CENTRALIZADA ⚠️
+        // Se você quer que TODAS as inspeções sejam salvas em UMA pasta específica:
+        // Vá em Configurações → Google Drive → Pasta Centralizada e configure lá
         
-        let SHARED_FOLDER_ID = '19H2cLVp7KeNs5rCxVh0wQqfxACxNoJHj'; // ✅ PRÉ-CONFIGURADO
+        let SHARED_FOLDER_ID = null; // Será carregado do localStorage
         
-        // Carregar configuração (ID já vem pré-configurado no código)
+        // Carregar do localStorage na inicialização
         function loadSharedFolderConfig() {
-            console.log('✅ Pasta compartilhada PRÉ-CONFIGURADA:', SHARED_FOLDER_ID);
-            
-            // Preencher o campo na interface com o ID pré-configurado
-            const input = document.getElementById('sharedFolderId');
-            if (input) {
-                input.value = SHARED_FOLDER_ID;
-                input.disabled = true; // Bloquear edição já que está pré-configurado
-                input.style.background = '#e8f5e9'; // Verde claro para indicar configuração ativa
-                input.style.color = '#2e7d32'; // Verde escuro
-                input.style.fontWeight = 'bold';
-            }
-            
-            // Salvar no localStorage se ainda não estiver salvo
-            if (localStorage.getItem('SHARED_FOLDER_ID') !== SHARED_FOLDER_ID) {
-                localStorage.setItem('SHARED_FOLDER_ID', SHARED_FOLDER_ID);
-                console.log('💾 ID da pasta salvo automaticamente no localStorage');
+            const savedFolderId = localStorage.getItem('SHARED_FOLDER_ID');
+            if (savedFolderId) {
+                SHARED_FOLDER_ID = savedFolderId;
+                console.log('📁 Pasta compartilhada configurada:', SHARED_FOLDER_ID);
+                
+                // Preencher o campo na interface
+                const input = document.getElementById('sharedFolderId');
+                if (input) input.value = SHARED_FOLDER_ID;
             }
         }
 
@@ -1488,6 +1633,235 @@
         let currentInspectionType = null;
         let selectedInitialInspection = null;
         let photoData = {};
+        let currentUser = null; // Usuário logado
+
+        // ==========================================
+        // SISTEMA DE AUTENTICAÇÃO
+        // ==========================================
+        
+        // Inicializar sistema com usuário admin padrão
+        function initializeAuthSystem() {
+            let users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            
+            // Criar admin padrão se não existir nenhum usuário
+            if (users.length === 0) {
+                const defaultAdmin = {
+                    id: Date.now().toString(),
+                    name: 'Administrador',
+                    username: 'admin',
+                    password: 'admin123', // Senha padrão - DEVE SER ALTERADA
+                    isAdmin: true,
+                    createdAt: new Date().toISOString()
+                };
+                users.push(defaultAdmin);
+                localStorage.setItem('systemUsers', JSON.stringify(users));
+                console.log('✅ Usuário admin padrão criado: admin / admin123');
+            }
+        }
+        
+        // Tentar fazer login
+        function attemptLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            
+            if (!username || !password) {
+                alert('⚠️ Por favor, preencha usuário e senha.');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            const user = users.find(u => u.username === username && u.password === password);
+            
+            if (user) {
+                // Login bem-sucedido
+                currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                
+                // Ocultar tela de login
+                document.getElementById('loginScreen').classList.remove('active');
+                
+                // Conectar automaticamente ao Google Drive
+                showProgress('Conectando ao Google Drive...');
+                initializeGoogleDrive();
+                
+                // Atualizar interface
+                document.getElementById('currentUserDisplay').textContent = user.name;
+                
+                // Mostrar botão de admin se for admin
+                if (user.isAdmin) {
+                    document.getElementById('adminMenuButton').style.display = 'block';
+                }
+                
+                playSound('success');
+            } else {
+                alert('❌ Usuário ou senha incorretos!');
+                document.getElementById('loginPassword').value = '';
+                document.getElementById('loginPassword').focus();
+            }
+        }
+        
+        // Logout
+        function logout() {
+            if (confirm('Deseja realmente sair do sistema?')) {
+                currentUser = null;
+                localStorage.removeItem('currentUser');
+                
+                // Limpar token do Drive
+                accessToken = null;
+                
+                // Recarregar página
+                window.location.reload();
+            }
+        }
+        
+        // Adicionar novo usuário (apenas admin)
+        function addNewUser() {
+            if (!currentUser || !currentUser.isAdmin) {
+                alert('❌ Apenas administradores podem adicionar usuários!');
+                return;
+            }
+            
+            const name = document.getElementById('newUserName').value.trim();
+            const username = document.getElementById('newUserUsername').value.trim();
+            const password = document.getElementById('newUserPassword').value.trim();
+            const isAdmin = document.getElementById('newUserIsAdmin').checked;
+            
+            // Validações
+            if (!name || !username || !password) {
+                alert('⚠️ Preencha todos os campos!');
+                return;
+            }
+            
+            if (username.length < 3) {
+                alert('⚠️ Usuário deve ter pelo menos 3 caracteres!');
+                return;
+            }
+            
+            if (password.length < 4) {
+                alert('⚠️ Senha deve ter pelo menos 4 caracteres!');
+                return;
+            }
+            
+            // Verificar se usuário já existe
+            const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            if (users.find(u => u.username === username)) {
+                alert('❌ Este nome de usuário já existe!');
+                return;
+            }
+            
+            // Criar novo usuário
+            const newUser = {
+                id: Date.now().toString(),
+                name: name,
+                username: username,
+                password: password,
+                isAdmin: isAdmin,
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser.username
+            };
+            
+            users.push(newUser);
+            localStorage.setItem('systemUsers', JSON.stringify(users));
+            
+            // Limpar campos
+            document.getElementById('newUserName').value = '';
+            document.getElementById('newUserUsername').value = '';
+            document.getElementById('newUserPassword').value = '';
+            document.getElementById('newUserIsAdmin').checked = false;
+            
+            // Atualizar lista
+            loadUsersList();
+            
+            playSound('success');
+            alert(`✅ Usuário "${name}" criado com sucesso!\n\nUsuário: ${username}\nSenha: ${password}\n\n⚠️ Anote estas credenciais!`);
+        }
+        
+        // Carregar lista de usuários
+        function loadUsersList() {
+            const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            const container = document.getElementById('usersList');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999;">Nenhum usuário cadastrado</p>';
+                return;
+            }
+            
+            let html = '<div style="display: grid; gap: 15px;">';
+            
+            users.forEach(user => {
+                const isCurrentUser = currentUser && currentUser.id === user.id;
+                const createdDate = new Date(user.createdAt).toLocaleDateString('pt-BR');
+                
+                html += `
+                    <div style="padding: 20px; background: ${isCurrentUser ? '#e3f2fd' : 'white'}; border: 2px solid ${isCurrentUser ? '#2196f3' : '#e0e0e0'}; border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <h4 style="margin: 0; color: #333;">${user.name}</h4>
+                                    ${user.isAdmin ? '<span style="background: #FF9800; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">ADMIN</span>' : ''}
+                                    ${isCurrentUser ? '<span style="background: #2196f3; color: white; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">VOCÊ</span>' : ''}
+                                </div>
+                                <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                                    <strong>Usuário:</strong> ${user.username}<br>
+                                    <strong>Criado em:</strong> ${createdDate}
+                                    ${user.createdBy ? `<br><strong>Criado por:</strong> ${user.createdBy}` : ''}
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                ${!isCurrentUser ? `<button onclick="deleteUser('${user.id}')" class="btn btn-secondary" style="background: #dc3545; font-size: 12px; padding: 8px 15px;">🗑️ Excluir</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        // Excluir usuário
+        function deleteUser(userId) {
+            if (!currentUser || !currentUser.isAdmin) {
+                alert('❌ Apenas administradores podem excluir usuários!');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            const user = users.find(u => u.id === userId);
+            
+            if (!user) return;
+            
+            if (user.id === currentUser.id) {
+                alert('❌ Você não pode excluir seu próprio usuário!');
+                return;
+            }
+            
+            if (confirm(`Deseja realmente excluir o usuário "${user.name}"?`)) {
+                const updatedUsers = users.filter(u => u.id !== userId);
+                localStorage.setItem('systemUsers', JSON.stringify(updatedUsers));
+                loadUsersList();
+                playSound('success');
+                alert('✅ Usuário excluído com sucesso!');
+            }
+        }
+        
+        // Mostrar painel de administração
+        function showAdminPanel() {
+            if (!currentUser || !currentUser.isAdmin) {
+                alert('❌ Apenas administradores podem acessar este painel!');
+                return;
+            }
+            
+            document.getElementById('mainMenu').classList.remove('active');
+            document.getElementById('adminPanel').style.display = 'block';
+            loadUsersList();
+        }
+        
+        // Fechar painel de administração
+        function closeAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('mainMenu').classList.add('active');
+        }
 
         // Patologias Info Database
         const patologiasInfo = {
@@ -1593,20 +1967,6 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainMenu').classList.add('active');
             loadInspections();
-        }
-
-        // Abrir pasta compartilhada no Google Drive
-        function openSharedFolder() {
-            if (!SHARED_FOLDER_ID) {
-                alert('❌ Nenhuma pasta compartilhada configurada!');
-                return;
-            }
-            
-            const driveUrl = `https://drive.google.com/drive/folders/${SHARED_FOLDER_ID}`;
-            window.open(driveUrl, '_blank');
-            
-            playSound('success');
-            console.log('📂 Abrindo pasta compartilhada:', driveUrl);
         }
 
         // Load inspections from localStorage
@@ -2562,6 +2922,398 @@
             displayPhotos(itemId);
         }
 
+        // Download PDF Report
+        async function downloadPDFReport() {
+            // Validar formulário primeiro
+            if (!validateForm()) {
+                alert('⚠️ Por favor, preencha todos os campos obrigatórios antes de gerar o relatório.');
+                return;
+            }
+            
+            // Coletar dados do formulário
+            const inspection = collectFormData();
+            
+            // Verificar se jsPDF está disponível
+            if (typeof window.jspdf === 'undefined') {
+                alert('⚠️ Biblioteca jsPDF ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                return;
+            }
+            
+            try {
+                showProgress('Gerando relatório PDF...');
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                let yPos = 20;
+                const pageHeight = doc.internal.pageSize.height;
+                const pageWidth = doc.internal.pageSize.width;
+                const margin = 15;
+                const maxWidth = pageWidth - (2 * margin);
+                
+                // Função para adicionar nova página se necessário
+                const checkPageBreak = (neededSpace = 20) => {
+                    if (yPos + neededSpace > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = 20;
+                        return true;
+                    }
+                    return false;
+                };
+                
+                // Título do relatório
+                doc.setFontSize(20);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(102, 126, 234);
+                doc.text('RELATÓRIO DE INSPEÇÃO RESIDENCIAL', margin, yPos);
+                yPos += 10;
+                
+                // Tipo de inspeção
+                doc.setFontSize(14);
+                doc.setTextColor(100, 100, 100);
+                const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
+                doc.text(tipoTexto, margin, yPos);
+                yPos += 15;
+                
+                // Linha divisória
+                doc.setDrawColor(102, 126, 234);
+                doc.setLineWidth(0.5);
+                doc.line(margin, yPos, pageWidth - margin, yPos);
+                yPos += 10;
+                
+                // DADOS DO IMÓVEL
+                doc.setFontSize(14);
+                doc.setTextColor(0, 0, 0);
+                doc.setFont(undefined, 'bold');
+                doc.text('DADOS DO IMÓVEL', margin, yPos);
+                yPos += 8;
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                
+                const dadosImovel = [
+                    ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
+                    ['Complemento:', inspection.complemento || 'N/A'],
+                    ['Bairro:', inspection.bairro],
+                    ['Município/UF:', `${inspection.municipio} - ${inspection.uf}`],
+                    ['Data da Vistoria:', inspection.dataVistoria],
+                    ['Hora da Vistoria:', inspection.horaVistoria],
+                    ['Acompanhante:', inspection.acompanhante],
+                    ['Idade do Imóvel:', `${inspection.idadeImovel} anos`]
+                ];
+                
+                dadosImovel.forEach(([label, value]) => {
+                    checkPageBreak();
+                    doc.setFont(undefined, 'bold');
+                    doc.text(label, margin, yPos);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(String(value), margin + 45, yPos);
+                    yPos += 6;
+                });
+                
+                yPos += 5;
+                
+                // CARACTERÍSTICAS
+                checkPageBreak(30);
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text('CARACTERÍSTICAS DO IMÓVEL', margin, yPos);
+                yPos += 8;
+                
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                
+                const caracteristicas = [
+                    ['Pavimentos:', inspection.qtdPavimentos || 'N/A'],
+                    ['Salas:', inspection.qtdSalas || 'N/A'],
+                    ['Quartos:', inspection.qtdQuartos || 'N/A'],
+                    ['Suítes:', inspection.qtdSuites || 'N/A'],
+                    ['Cozinhas:', inspection.qtdCozinhas || 'N/A'],
+                    ['Quintal:', inspection.possuiQuintal || 'N/A'],
+                    ['Garagem:', inspection.possuiGaragem || 'N/A']
+                ];
+                
+                caracteristicas.forEach(([label, value]) => {
+                    checkPageBreak();
+                    doc.setFont(undefined, 'bold');
+                    doc.text(label, margin, yPos);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(String(value), margin + 45, yPos);
+                    yPos += 6;
+                });
+                
+                yPos += 10;
+                
+                // PROBLEMAS ENCONTRADOS
+                const problemasEncontrados = [];
+                
+                if (inspection.checklist) {
+                    Object.keys(inspection.checklist).forEach(itemId => {
+                        const item = inspection.checklist[itemId];
+                        if (item.status === 'issue') {
+                            const categoryName = getCategoryNameFromId(itemId);
+                            const itemName = getItemNameFromId(itemId);
+                            
+                            if (item.occurrences && item.occurrences.length > 0) {
+                                item.occurrences.forEach((occ, index) => {
+                                    const occNum = occ.occurrenceNum || (index + 1);
+                                    problemasEncontrados.push({
+                                        categoria: categoryName,
+                                        item: itemName,
+                                        ocorrencia: occNum,
+                                        observacao: occ.observation || 'Sem observação',
+                                        photoKey: `${itemId}_${occNum}`
+                                    });
+                                });
+                            } else if (item.observation) {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: item.observation,
+                                    photoKey: `${itemId}_1`
+                                });
+                            } else {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: 'Problema identificado',
+                                    photoKey: `${itemId}_1`
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                if (problemasEncontrados.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(220, 53, 69);
+                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    doc.setFontSize(10);
+                    
+                    for (let i = 0; i < problemasEncontrados.length; i++) {
+                        const problema = problemasEncontrados[i];
+                        
+                        checkPageBreak(30);
+                        
+                        // Número do problema
+                        doc.setFont(undefined, 'bold');
+                        doc.setFontSize(11);
+                        doc.text(`${i + 1}. ${problema.categoria} - ${problema.item}`, margin, yPos);
+                        yPos += 6;
+                        
+                        // Ocorrência (se houver múltiplas)
+                        if (problemasEncontrados.filter(p => p.item === problema.item).length > 1) {
+                            doc.setFont(undefined, 'italic');
+                            doc.setFontSize(9);
+                            doc.setTextColor(100, 100, 100);
+                            doc.text(`(Ocorrência ${problema.ocorrencia})`, margin + 5, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            yPos += 5;
+                        }
+                        
+                        // Observação
+                        doc.setFont(undefined, 'normal');
+                        doc.setFontSize(10);
+                        const obsText = `Observação: ${problema.observacao}`;
+                        const obsLines = doc.splitTextToSize(obsText, maxWidth - 10);
+                        obsLines.forEach(line => {
+                            checkPageBreak();
+                            doc.text(line, margin + 5, yPos);
+                            yPos += 5;
+                        });
+                        
+                        yPos += 3;
+                        
+                        // Adicionar fotos se existirem
+                        if (inspection.photos && inspection.photos[problema.photoKey]) {
+                            const fotos = inspection.photos[problema.photoKey];
+                            
+                            for (let j = 0; j < fotos.length; j++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    doc.addImage(fotos[j], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`Foto ${j + 1} - ${problema.observacao}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('Erro ao adicionar foto ao PDF:', error);
+                                    doc.setFontSize(9);
+                                    doc.setTextColor(200, 0, 0);
+                                    doc.text(`[Erro ao carregar foto ${j + 1}]`, margin + 10, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    yPos += 6;
+                                }
+                            }
+                        } else {
+                            doc.setFontSize(9);
+                            doc.setTextColor(150, 150, 150);
+                            doc.text('(Sem fotos anexadas)', margin + 10, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            doc.setFontSize(10);
+                            yPos += 6;
+                        }
+                        
+                        yPos += 8;
+                    }
+                } else {
+                    checkPageBreak(20);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
+                    yPos += 10;
+                    
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0, 150, 0);
+                    doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                }
+                
+                // FOTOS GERAIS
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(102, 126, 234);
+                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            checkPageBreak(25);
+                            
+                            doc.setFontSize(11);
+                            doc.setFont(undefined, 'bold');
+                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
+                            yPos += 6;
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    doc.addImage(fotoGeral.fotos[i], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`${fotoGeral.nome} - Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('Erro ao adicionar foto geral:', error);
+                                }
+                            }
+                            
+                            yPos += 5;
+                        }
+                    }
+                }
+                
+                // Rodapé em todas as páginas
+                const totalPages = doc.internal.pages.length - 1;
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
+                    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
+                }
+                
+                // Salvar PDF
+                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.pdf`;
+                doc.save(nomeArquivo);
+                
+                hideProgress();
+                playSound('success');
+                alert('✅ Relatório PDF gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.');
+                
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao gerar PDF:', error);
+                alert('❌ Erro ao gerar PDF. Verifique o console para mais detalhes.\n\nErro: ' + error.message);
+            }
+        }
+        
+        // Funções auxiliares para o PDF
+        function getCategoryNameFromId(itemId) {
+            const categoryMap = {
+                'paredes': 'Paredes',
+                'teto': 'Teto/Forro',
+                'piso': 'Piso/Revestimento',
+                'portas': 'Portas e Janelas',
+                'eletrica': 'Sistema Elétrico',
+                'hidraulica': 'Sistema Hidráulico',
+                'banheiro': 'Banheiros',
+                'cozinha': 'Cozinha',
+                'telhado': 'Telhado/Cobertura',
+                'estrutura': 'Estrutura Geral',
+                'fotos': 'Fotos Gerais'
+            };
+            
+            for (const [key, value] of Object.entries(categoryMap)) {
+                if (itemId.startsWith(key)) {
+                    return value;
+                }
+            }
+            
+            return 'Outros';
+        }
+        
+        function getItemNameFromId(itemId) {
+            // Remove o prefixo da categoria
+            const parts = itemId.split('_');
+            if (parts.length > 1) {
+                let nome = parts.slice(1).join(' ');
+                // Adiciona espaços antes de letras maiúsculas
+                nome = nome.replace(/([A-Z])/g, ' $1').trim();
+                // Capitaliza primeira letra
+                nome = nome.charAt(0).toUpperCase() + nome.slice(1);
+                return nome;
+            }
+            return itemId;
+        }
+
         // Save inspection
         async function saveInspection() {
             if (!validateForm()) {
@@ -2575,10 +3327,18 @@
             inspections.push(inspection);
             saveInspections();
 
-            // Sucesso
-            playSound('success');
-            alert('✅ Inspeção salva com sucesso no armazenamento local!\n\n💡 Dica: Use o botão "📄 Baixar Relatório PDF" para gerar o documento completo.');
-            backToMenu();
+            // Save to Google Drive
+            try {
+                showProgress('Salvando inspeção no Google Drive...');
+                await saveToGoogleDrive(inspection);
+                hideProgress();
+                alert('Inspeção salva com sucesso!');
+                backToMenu();
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao salvar:', error);
+                alert('Erro ao salvar no Google Drive, mas a inspeção foi salva localmente.');
+            }
         }
 
         // Validate form
@@ -2680,365 +3440,6 @@
             });
             
             return checklist;
-        }
-
-        // Download PDF Report
-        async function downloadPDFReport() {
-            // Coletar dados do formulário
-            const inspection = collectFormData();
-            
-            // Verificar se jsPDF está disponível
-            if (typeof window.jspdf === 'undefined') {
-                alert('⚠️ Biblioteca jsPDF não carregada. Aguarde e tente novamente.');
-                return;
-            }
-            
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            
-            let yPos = 20;
-            const pageHeight = doc.internal.pageSize.height;
-            const pageWidth = doc.internal.pageSize.width;
-            const margin = 15;
-            const maxWidth = pageWidth - (2 * margin);
-            
-            // Função para adicionar nova página se necessário
-            const checkPageBreak = (neededSpace = 20) => {
-                if (yPos + neededSpace > pageHeight - 20) {
-                    doc.addPage();
-                    yPos = 20;
-                    return true;
-                }
-                return false;
-            };
-            
-            // Título do relatório
-            doc.setFontSize(20);
-            doc.setFont(undefined, 'bold');
-            doc.text('RELATÓRIO DE INSPEÇÃO RESIDENCIAL', margin, yPos);
-            yPos += 12;
-            
-            // Tipo de inspeção
-            doc.setFontSize(14);
-            doc.setTextColor(100, 100, 100);
-            const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
-            doc.text(tipoTexto, margin, yPos);
-            yPos += 15;
-            
-            // Linha divisória
-            doc.setDrawColor(102, 126, 234);
-            doc.setLineWidth(0.5);
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // DADOS DO IMÓVEL
-            doc.setFontSize(14);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont(undefined, 'bold');
-            doc.text('DADOS DO IMÓVEL', margin, yPos);
-            yPos += 8;
-            
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            
-            const dadosImovel = [
-                ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
-                ['Complemento:', inspection.complemento || 'N/A'],
-                ['Bairro:', inspection.bairro],
-                ['Município/UF:', `${inspection.municipio} - ${inspection.uf}`],
-                ['Data da Vistoria:', inspection.dataVistoria],
-                ['Hora da Vistoria:', inspection.horaVistoria],
-                ['Acompanhante:', inspection.acompanhante],
-                ['Idade do Imóvel:', `${inspection.idadeImovel} anos`]
-            ];
-            
-            dadosImovel.forEach(([label, value]) => {
-                checkPageBreak();
-                doc.setFont(undefined, 'bold');
-                doc.text(label, margin, yPos);
-                doc.setFont(undefined, 'normal');
-                doc.text(value, margin + 40, yPos);
-                yPos += 6;
-            });
-            
-            yPos += 5;
-            
-            // CARACTERÍSTICAS
-            checkPageBreak(30);
-            doc.setFontSize(14);
-            doc.setFont(undefined, 'bold');
-            doc.text('CARACTERÍSTICAS', margin, yPos);
-            yPos += 8;
-            
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            
-            const caracteristicas = [
-                ['Pavimentos:', inspection.qtdPavimentos],
-                ['Salas:', inspection.qtdSalas],
-                ['Quartos:', inspection.qtdQuartos],
-                ['Suítes:', inspection.qtdSuites],
-                ['Cozinhas:', inspection.qtdCozinhas],
-                ['Quintal:', inspection.possuiQuintal],
-                ['Garagem:', inspection.possuiGaragem]
-            ];
-            
-            caracteristicas.forEach(([label, value]) => {
-                checkPageBreak();
-                doc.setFont(undefined, 'bold');
-                doc.text(label, margin, yPos);
-                doc.setFont(undefined, 'normal');
-                doc.text(value.toString(), margin + 40, yPos);
-                yPos += 6;
-            });
-            
-            yPos += 10;
-            
-            // PROBLEMAS ENCONTRADOS
-            const problemasEncontrados = [];
-            
-            if (inspection.checklist) {
-                Object.keys(inspection.checklist).forEach(itemId => {
-                    const item = inspection.checklist[itemId];
-                    if (item.status === 'issue') {
-                        const categoryName = getCategoryNameFromId(itemId);
-                        const itemName = getItemNameFromId(itemId);
-                        
-                        if (item.occurrences && item.occurrences.length > 0) {
-                            item.occurrences.forEach((occ, index) => {
-                                if (occ.observation) {
-                                    problemasEncontrados.push({
-                                        categoria: categoryName,
-                                        item: itemName,
-                                        ocorrencia: index + 1,
-                                        observacao: occ.observation,
-                                        photoKey: `${itemId}_${occ.occurrenceNum || (index + 1)}`
-                                    });
-                                }
-                            });
-                        } else if (item.observation) {
-                            problemasEncontrados.push({
-                                categoria: categoryName,
-                                item: itemName,
-                                ocorrencia: 1,
-                                observacao: item.observation,
-                                photoKey: `${itemId}_1`
-                            });
-                        }
-                    }
-                });
-            }
-            
-            if (problemasEncontrados.length > 0) {
-                checkPageBreak(30);
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
-                doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                yPos += 8;
-                
-                doc.setFontSize(10);
-                
-                for (let i = 0; i < problemasEncontrados.length; i++) {
-                    const problema = problemasEncontrados[i];
-                    
-                    checkPageBreak(25);
-                    
-                    // Número do problema
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(220, 53, 69);
-                    doc.text(`${i + 1}.`, margin, yPos);
-                    
-                    // Categoria e Item
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(`${problema.categoria} - ${problema.item}`, margin + 8, yPos);
-                    yPos += 6;
-                    
-                    // Ocorrência
-                    if (problema.ocorrencia > 1) {
-                        doc.setFont(undefined, 'italic');
-                        doc.setFontSize(9);
-                        doc.text(`(Ocorrência ${problema.ocorrencia})`, margin + 8, yPos);
-                        yPos += 5;
-                        doc.setFontSize(10);
-                    }
-                    
-                    // Observação
-                    doc.setFont(undefined, 'normal');
-                    const obsLines = doc.splitTextToSize(`Observação: ${problema.observacao}`, maxWidth - 10);
-                    obsLines.forEach(line => {
-                        checkPageBreak();
-                        doc.text(line, margin + 8, yPos);
-                        yPos += 5;
-                    });
-                    
-                    yPos += 3;
-                    
-                    // Adicionar fotos se existirem
-                    if (inspection.photos && inspection.photos[problema.photoKey]) {
-                        const fotos = inspection.photos[problema.photoKey];
-                        
-                        for (let j = 0; j < fotos.length; j++) {
-                            checkPageBreak(90);
-                            
-                            try {
-                                // Adicionar foto
-                                const imgWidth = 80;
-                                const imgHeight = 60;
-                                
-                                doc.addImage(fotos[j], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                
-                                // Legenda da foto
-                                doc.setFontSize(8);
-                                doc.setFont(undefined, 'italic');
-                                doc.setTextColor(100, 100, 100);
-                                doc.text(`Foto ${j + 1} - ${problema.item}`, margin + 10, yPos + imgHeight + 4);
-                                doc.setTextColor(0, 0, 0);
-                                doc.setFontSize(10);
-                                doc.setFont(undefined, 'normal');
-                                
-                                yPos += imgHeight + 10;
-                            } catch (error) {
-                                console.error('Erro ao adicionar foto ao PDF:', error);
-                                doc.setTextColor(200, 0, 0);
-                                doc.text(`[Erro ao carregar foto ${j + 1}]`, margin + 10, yPos);
-                                doc.setTextColor(0, 0, 0);
-                                yPos += 6;
-                            }
-                        }
-                    } else {
-                        doc.setFontSize(9);
-                        doc.setTextColor(150, 150, 150);
-                        doc.text('(Sem fotos anexadas)', margin + 10, yPos);
-                        doc.setTextColor(0, 0, 0);
-                        doc.setFontSize(10);
-                        yPos += 6;
-                    }
-                    
-                    yPos += 5;
-                }
-            } else {
-                checkPageBreak(20);
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
-                doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                yPos += 10;
-                
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(0, 150, 0);
-                doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
-                doc.setTextColor(0, 0, 0);
-                yPos += 10;
-            }
-            
-            // FOTOS GERAIS (se existirem)
-            const fotosGerais = [];
-            if (inspection.photos) {
-                Object.keys(inspection.photos).forEach(key => {
-                    if (key.startsWith('fotos_')) {
-                        fotosGerais.push({
-                            key: key,
-                            nome: key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' '),
-                            fotos: inspection.photos[key]
-                        });
-                    }
-                });
-            }
-            
-            if (fotosGerais.length > 0) {
-                checkPageBreak(30);
-                doc.setFontSize(14);
-                doc.setFont(undefined, 'bold');
-                doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
-                yPos += 10;
-                
-                for (const fotoGeral of fotosGerais) {
-                    if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
-                        checkPageBreak(25);
-                        
-                        doc.setFontSize(11);
-                        doc.setFont(undefined, 'bold');
-                        doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
-                        yPos += 6;
-                        
-                        for (let i = 0; i < fotoGeral.fotos.length; i++) {
-                            checkPageBreak(90);
-                            
-                            try {
-                                const imgWidth = 80;
-                                const imgHeight = 60;
-                                
-                                doc.addImage(fotoGeral.fotos[i], 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
-                                
-                                doc.setFontSize(8);
-                                doc.setFont(undefined, 'italic');
-                                doc.setTextColor(100, 100, 100);
-                                doc.text(`${fotoGeral.nome} - Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
-                                doc.setTextColor(0, 0, 0);
-                                doc.setFontSize(10);
-                                doc.setFont(undefined, 'normal');
-                                
-                                yPos += imgHeight + 10;
-                            } catch (error) {
-                                console.error('Erro ao adicionar foto geral:', error);
-                            }
-                        }
-                        
-                        yPos += 5;
-                    }
-                }
-            }
-            
-            // Rodapé em todas as páginas
-            const totalPages = doc.internal.pages.length - 1;
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.setTextColor(150, 150, 150);
-                doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
-                doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
-            }
-            
-            // Salvar PDF
-            const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio}_${inspection.dataVistoria.replace(/\//g, '-')}.pdf`;
-            doc.save(nomeArquivo);
-            
-            playSound('success');
-            alert('✅ Relatório PDF gerado com sucesso!');
-        }
-        
-        // Funções auxiliares para o PDF
-        function getCategoryNameFromId(itemId) {
-            const categoryMap = {
-                'paredes': 'Paredes',
-                'teto': 'Teto',
-                'piso': 'Piso',
-                'portas': 'Portas e Janelas',
-                'eletrica': 'Sistema Elétrico',
-                'hidraulica': 'Sistema Hidráulico',
-                'banheiro': 'Banheiros',
-                'cozinha': 'Cozinha',
-                'telhado': 'Telhado',
-                'estrutura': 'Estrutura Geral',
-                'fotos': 'Fotos Gerais'
-            };
-            
-            for (const [key, value] of Object.entries(categoryMap)) {
-                if (itemId.startsWith(key)) {
-                    return value;
-                }
-            }
-            
-            return 'Outros';
-        }
-        
-        function getItemNameFromId(itemId) {
-            // Remove o prefixo da categoria e underscores, retorna nome legível
-            const parts = itemId.split('_');
-            if (parts.length > 1) {
-                return parts.slice(1).join(' ').replace(/([A-Z])/g, ' $1').trim();
-            }
-            return itemId;
         }
 
         // Save to Google Drive
@@ -4285,20 +4686,41 @@ Ao continuar usando, você aceita estes termos.
 
         // Initialize on page load
         window.addEventListener('load', async () => {
+            // Inicializar sistema de autenticação
+            initializeAuthSystem();
+            
             // Carregar configuração de pasta compartilhada
             loadSharedFolderConfig();
             
-            // Load user settings
-            loadSettings();
-            
-            // Carregar inspeções salvas localmente
-            const savedInspections = localStorage.getItem('inspections');
-            if (savedInspections) {
-                inspections = JSON.parse(savedInspections);
-                console.log(`✅ ${inspections.length} inspeções carregadas do armazenamento local`);
+            // Verificar se há usuário logado
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    console.log('✅ Sessão ativa encontrada:', currentUser.name);
+                    
+                    // Ocultar tela de login e conectar ao Drive
+                    document.getElementById('loginScreen').classList.remove('active');
+                    
+                    // Atualizar interface
+                    document.getElementById('currentUserDisplay').textContent = currentUser.name;
+                    if (currentUser.isAdmin) {
+                        document.getElementById('adminMenuButton').style.display = 'block';
+                    }
+                    
+                    // Inicializar Google Drive automaticamente
+                    console.log('🔄 Conectando ao Google Drive...');
+                    initializeGoogleDrive();
+                } catch (e) {
+                    console.error('Erro ao restaurar sessão:', e);
+                    localStorage.removeItem('currentUser');
+                }
+            } else {
+                console.log('🔐 Nenhuma sessão ativa. Aguardando login...');
             }
             
-            console.log('✅ Sistema inicializado - Pronto para uso!');
+            // Load user settings
+            loadSettings();
         });
     </script>
 </body>
