@@ -4162,6 +4162,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 const pageHeight = doc.internal.pageSize.height;
                 const pageWidth = doc.internal.pageSize.width;
                 const margin = 15;
+                const maxWidth = pageWidth - (2 * margin);
                 
                 const checkPageBreak = (neededSpace = 20) => {
                     if (yPos + neededSpace > pageHeight - 20) {
