@@ -607,8 +607,8 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <div class="auto-sync-badge">
-                Pasta Sincronizada Automaticamente
+            <div class="auto-sync-badge" id="syncBadge">
+                <span id="syncBadgeText">Modo Local</span>
             </div>
             <h1>🏠 Sistema de Inspeção Residencial</h1>
             <p>Versão 3.3 - Sincronização Automática com Google Drive</p>
@@ -640,12 +640,12 @@
                 </div>
 
                 <div style="margin-top: 30px; padding: 20px; background: #f8f9ff; border-radius: 10px;">
-                    <p style="font-size: 14px; color: #667eea; font-weight: 600; margin-bottom: 10px;">
-                        📁 Pasta Compartilhada Configurada
+                    <p style="font-size: 14px; color: #667eea; font-weight: 600; margin-bottom: 10px;" id="driveStatusTitle">
+                        💾 Modo de Armazenamento Local
                     </p>
-                    <p style="font-size: 13px; color: #666;">
-                        Todas as inspeções serão salvas automaticamente na pasta compartilhada do Google Drive.
-                        Não é necessário configurar manualmente!
+                    <p style="font-size: 13px; color: #666;" id="driveStatusText">
+                        Configure as credenciais do Google Drive para habilitar a sincronização automática em nuvem.
+                        Por enquanto, todas as inspeções serão salvas localmente no seu navegador.
                     </p>
                 </div>
             </div>
@@ -725,10 +725,13 @@
         const SHARED_FOLDER_ID = '19H2cLVp7KeNs5rCxVh0wQqfxACxNoJHj';
         
         // Configurações da API do Google Drive
-        const CLIENT_ID = 'SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
-        const API_KEY = 'SUA_API_KEY_AQUI';
+        const CLIENT_ID = ''; // DEIXE VAZIO POR ENQUANTO - Configure depois em: https://console.cloud.google.com/
+        const API_KEY = ''; // DEIXE VAZIO POR ENQUANTO
         const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        // Verificar se as credenciais foram configuradas
+        const DRIVE_ENABLED = CLIENT_ID && API_KEY && CLIENT_ID !== 'SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
 
         let tokenClient;
         let accessToken = null;
@@ -739,6 +742,39 @@
         let currentUser = null;
         let currentInspection = null;
         let savedInspections = [];
+
+        // Atualizar badge do header
+        function updateSyncBadge() {
+            const badge = document.getElementById('syncBadge');
+            const badgeText = document.getElementById('syncBadgeText');
+            
+            if (DRIVE_ENABLED && accessToken) {
+                badge.style.background = 'rgba(76, 175, 80, 0.3)';
+                badgeText.textContent = '☁️ Sincronizado com Drive';
+            } else if (DRIVE_ENABLED && !accessToken) {
+                badge.style.background = 'rgba(255, 152, 0, 0.3)';
+                badgeText.textContent = '🔄 Aguardando autorização';
+            } else {
+                badge.style.background = 'rgba(255, 255, 255, 0.2)';
+                badgeText.textContent = '💾 Modo Local';
+            }
+        }
+
+        // Atualizar status do Drive na tela de login
+        function updateDriveStatus() {
+            const titleEl = document.getElementById('driveStatusTitle');
+            const textEl = document.getElementById('driveStatusText');
+            
+            if (DRIVE_ENABLED) {
+                titleEl.textContent = '📁 Pasta Compartilhada Configurada';
+                titleEl.style.color = '#4CAF50';
+                textEl.textContent = 'Todas as inspeções serão salvas automaticamente na pasta compartilhada do Google Drive. Não é necessário configurar manualmente!';
+            } else {
+                titleEl.textContent = '💾 Modo de Armazenamento Local';
+                titleEl.style.color = '#FF9800';
+                textEl.innerHTML = 'Configure as credenciais do Google Drive para habilitar a sincronização automática em nuvem.<br>Por enquanto, todas as inspeções serão salvas localmente no seu navegador.';
+            }
+        }
 
         // ==================== NOTIFICAÇÕES ====================
         function showNotification(message, type = 'success') {
@@ -797,27 +833,43 @@
                 document.getElementById('adminMenuButton').style.display = 'block';
             }
             
-            // Inicializar Google Drive API
-            showProgress('Conectando ao Google Drive...');
-            initializeGoogleDrive();
+            // Atualizar badge
+            updateSyncBadge();
+            
+            // Inicializar Google Drive API apenas se configurado
+            if (DRIVE_ENABLED) {
+                showProgress('Conectando ao Google Drive...');
+                initializeGoogleDrive();
+            } else {
+                console.warn('⚠️ Google Drive não configurado. Usando apenas armazenamento local.');
+                showNotification('Modo Local - Configure Google Drive nas configurações', 'info');
+                showMainMenu();
+            }
         }
 
         function logout() {
             if (confirm('Deseja realmente sair?')) {
                 localStorage.removeItem('currentUser');
-                google.accounts.oauth2.revoke(accessToken, () => {
+                if (DRIVE_ENABLED && accessToken && google && google.accounts && google.accounts.oauth2) {
+                    google.accounts.oauth2.revoke(accessToken, () => {
+                        accessToken = null;
+                        window.location.reload();
+                    });
+                } else {
                     accessToken = null;
                     window.location.reload();
-                });
+                }
             }
         }
 
         // ==================== GOOGLE DRIVE API ====================
         function gapiLoaded() {
+            if (!DRIVE_ENABLED) return;
             gapi.load('client', initializeGapiClient);
         }
 
         async function initializeGapiClient() {
+            if (!DRIVE_ENABLED) return;
             try {
                 await gapi.client.init({
                     apiKey: API_KEY,
@@ -827,22 +879,29 @@
                 checkInitialization();
             } catch (error) {
                 console.error('Erro ao inicializar GAPI:', error);
-                showNotification('Erro ao conectar com Google Drive', 'error');
+                hideProgress();
+                showNotification('Erro ao conectar com Google Drive. Usando modo local.', 'error');
+                showMainMenu();
             }
         }
 
         function gisLoaded() {
+            if (!DRIVE_ENABLED) return;
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES,
                 callback: (response) => {
                     if (response.error) {
                         console.error('Erro na autenticação:', response);
-                        showNotification('Erro na autenticação', 'error');
+                        hideProgress();
+                        showNotification('Erro na autenticação. Usando modo local.', 'error');
+                        updateSyncBadge();
+                        showMainMenu();
                         return;
                     }
                     accessToken = response.access_token;
                     hideProgress();
+                    updateSyncBadge();
                     showMainMenu();
                     showNotification('✅ Conectado ao Google Drive!');
                 },
@@ -852,12 +911,14 @@
         }
 
         function checkInitialization() {
+            if (!DRIVE_ENABLED) return;
             if (gapiInited && gisInited && currentUser) {
                 requestAccessToken();
             }
         }
 
         function requestAccessToken() {
+            if (!DRIVE_ENABLED) return;
             if (!accessToken) {
                 tokenClient.requestAccessToken({ prompt: 'consent' });
             } else {
@@ -867,6 +928,10 @@
         }
 
         function initializeGoogleDrive() {
+            if (!DRIVE_ENABLED) {
+                console.warn('⚠️ Google Drive desabilitado - credenciais não configuradas');
+                return;
+            }
             if (!gapiInited) {
                 gapiLoaded();
             }
@@ -877,6 +942,13 @@
 
         // ==================== SALVAMENTO NO GOOGLE DRIVE ====================
         async function saveInspectionToDrive(inspectionData) {
+            if (!DRIVE_ENABLED || !accessToken) {
+                console.log('💾 Salvando apenas localmente...');
+                saveInspectionLocally(inspectionData);
+                showNotification('✅ Inspeção salva localmente!');
+                return;
+            }
+            
             showSyncStatus('syncing', 'Salvando no Drive...');
             
             try {
@@ -932,13 +1004,25 @@
 
         function saveInspectionLocally(inspectionData) {
             let inspections = JSON.parse(localStorage.getItem('savedInspections') || '[]');
-            inspections.push(inspectionData);
+            inspections.push({
+                ...inspectionData,
+                savedAt: new Date().toISOString(),
+                savedLocally: true
+            });
             localStorage.setItem('savedInspections', JSON.stringify(inspections));
         }
 
         // ==================== CARREGAR INSPEÇÕES ====================
         async function loadInspectionsFromDrive() {
             showProgress('Carregando inspeções...');
+            
+            // Se Drive não estiver configurado, carregar apenas do local
+            if (!DRIVE_ENABLED || !accessToken) {
+                console.log('📂 Carregando inspeções locais...');
+                const localInspections = JSON.parse(localStorage.getItem('savedInspections') || '[]');
+                hideProgress();
+                return localInspections;
+            }
             
             try {
                 const response = await gapi.client.drive.files.list({
@@ -958,20 +1042,28 @@
                         });
                         inspections.push({
                             ...fileResponse.result,
-                            driveFileId: file.id
+                            driveFileId: file.id,
+                            savedLocally: false
                         });
                     } catch (error) {
                         console.error('Erro ao carregar arquivo:', error);
                     }
                 }
+                
+                // Mesclar com inspeções locais
+                const localInspections = JSON.parse(localStorage.getItem('savedInspections') || '[]');
+                const allInspections = [...inspections, ...localInspections];
 
                 hideProgress();
-                return inspections;
+                return allInspections;
             } catch (error) {
                 console.error('Erro ao listar inspeções:', error);
                 hideProgress();
-                showNotification('⚠️ Erro ao carregar inspeções do Drive', 'error');
-                return [];
+                showNotification('⚠️ Erro ao carregar do Drive. Carregando locais.', 'error');
+                
+                // Fallback para inspeções locais
+                const localInspections = JSON.parse(localStorage.getItem('savedInspections') || '[]');
+                return localInspections;
             }
         }
 
@@ -1052,7 +1144,12 @@
         }
 
         function showSettings() {
-            alert('⚙️ CONFIGURAÇÕES\n\n✅ Pasta do Google Drive: Configurada automaticamente\n✅ ID da Pasta: ' + SHARED_FOLDER_ID + '\n\n📁 Todas as inspeções são salvas automaticamente na pasta compartilhada!\n\nNão é necessário configurar manualmente.');
+            const status = DRIVE_ENABLED ? '✅ CONFIGURADO' : '⚠️ NÃO CONFIGURADO';
+            const instructions = DRIVE_ENABLED 
+                ? 'Google Drive está conectado e funcionando!\n\n📁 ID da Pasta: ' + SHARED_FOLDER_ID 
+                : 'Para habilitar o Google Drive:\n\n1. Acesse: https://console.cloud.google.com/\n2. Crie um projeto (ou use existente)\n3. Ative a Google Drive API\n4. Crie credenciais OAuth 2.0\n5. Configure CLIENT_ID e API_KEY no código\n\n📁 ID da Pasta Compartilhada: ' + SHARED_FOLDER_ID + '\n\nEnquanto isso, o sistema funciona perfeitamente em modo local!';
+            
+            alert(`⚙️ CONFIGURAÇÕES\n\nGoogle Drive: ${status}\n\n${instructions}`);
         }
 
         function showAdminPanel() {
@@ -1061,30 +1158,52 @@
 
         // ==================== INICIALIZAÇÃO ====================
         window.addEventListener('load', () => {
+            // Atualizar status do Drive na interface
+            updateSyncBadge();
+            updateDriveStatus();
+            
             // Verificar se há sessão ativa
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                document.getElementById('loginScreen').classList.remove('active');
-                document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.name}`;
-                
-                if (currentUser.isAdmin) {
-                    document.getElementById('adminMenuButton').style.display = 'block';
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    document.getElementById('loginScreen').classList.remove('active');
+                    document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser.name}`;
+                    
+                    if (currentUser.isAdmin) {
+                        document.getElementById('adminMenuButton').style.display = 'block';
+                    }
+                    
+                    if (DRIVE_ENABLED) {
+                        showProgress('Conectando ao Google Drive...');
+                        initializeGoogleDrive();
+                    } else {
+                        console.warn('⚠️ Google Drive não configurado. Usando modo local.');
+                        showMainMenu();
+                    }
+                } catch (e) {
+                    console.error('Erro ao restaurar sessão:', e);
+                    localStorage.removeItem('currentUser');
                 }
-                
-                showProgress('Conectando ao Google Drive...');
-                initializeGoogleDrive();
             }
             
             // Log de inicialização
             console.log('🚀 Sistema de Inspeção Residencial v3.3');
             console.log('📁 Pasta compartilhada:', SHARED_FOLDER_ID);
-            console.log('✅ Sincronização automática habilitada');
+            if (DRIVE_ENABLED) {
+                console.log('✅ Google Drive habilitado');
+            } else {
+                console.log('⚠️ Google Drive não configurado - Modo Local');
+                console.log('📝 Para configurar o Drive, siga as instruções em:');
+                console.log('   https://console.cloud.google.com/');
+            }
         });
 
-        // Carregar APIs do Google
-        window.gapiLoaded = gapiLoaded;
-        window.gisLoaded = gisLoaded;
+        // Carregar APIs do Google apenas se configurado
+        if (DRIVE_ENABLED) {
+            window.gapiLoaded = gapiLoaded;
+            window.gisLoaded = gisLoaded;
+        }
     </script>
 </body>
 </html>
