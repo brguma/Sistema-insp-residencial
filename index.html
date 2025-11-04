@@ -4187,18 +4187,50 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 
                 yPos += 10;
                 
-                // PROBLEMAS (simplificado - você já tem a lógica completa em downloadPDFReport)
-                const problemas = [];
+                // PROBLEMAS ENCONTRADOS (COMPLETO COM FOTOS E OBSERVAÇÕES)
+                const maxWidth = pageWidth - (2 * margin);
+                const problemasEncontrados = [];
+                
                 if (inspection.checklist) {
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         if (item.status === 'issue') {
-                            problemas.push({ itemId, item });
+                            const categoryName = getCategoryNameFromId(itemId);
+                            const itemName = getItemNameFromId(itemId);
+                            
+                            if (item.occurrences && item.occurrences.length > 0) {
+                                item.occurrences.forEach((occ, index) => {
+                                    const occNum = occ.occurrenceNum || (index + 1);
+                                    problemasEncontrados.push({
+                                        categoria: categoryName,
+                                        item: itemName,
+                                        ocorrencia: occNum,
+                                        observacao: occ.observation || 'Sem observação',
+                                        photoKey: `${itemId}_${occNum}`
+                                    });
+                                });
+                            } else if (item.observation) {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: item.observation,
+                                    photoKey: `${itemId}_1`
+                                });
+                            } else {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: 'Problema identificado',
+                                    photoKey: `${itemId}_1`
+                                });
+                            }
                         }
                     });
                 }
                 
-                if (problemas.length > 0) {
+                if (problemasEncontrados.length > 0) {
                     checkPageBreak(30);
                     doc.setFontSize(14);
                     doc.setFont(undefined, 'bold');
@@ -4208,21 +4240,172 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     yPos += 10;
                     
                     doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(`Total: ${problemas.length} problema(s) identificado(s)`, margin, yPos);
-                    yPos += 10;
+                    
+                    for (let i = 0; i < problemasEncontrados.length; i++) {
+                        const problema = problemasEncontrados[i];
+                        
+                        checkPageBreak(30);
+                        
+                        // Número do problema
+                        doc.setFont(undefined, 'bold');
+                        doc.setFontSize(11);
+                        doc.text(`${i + 1}. ${problema.categoria} - ${problema.item}`, margin, yPos);
+                        yPos += 6;
+                        
+                        // Ocorrência (se houver múltiplas)
+                        if (problemasEncontrados.filter(p => p.item === problema.item).length > 1) {
+                            doc.setFont(undefined, 'italic');
+                            doc.setFontSize(9);
+                            doc.setTextColor(100, 100, 100);
+                            doc.text(`(Ocorrência ${problema.ocorrencia})`, margin + 5, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            yPos += 5;
+                        }
+                        
+                        // Observação
+                        doc.setFont(undefined, 'normal');
+                        doc.setFontSize(10);
+                        const obsText = `Observação: ${problema.observacao}`;
+                        const obsLines = doc.splitTextToSize(obsText, maxWidth - 10);
+                        obsLines.forEach(line => {
+                            checkPageBreak();
+                            doc.text(line, margin + 5, yPos);
+                            yPos += 5;
+                        });
+                        
+                        yPos += 3;
+                        
+                        // Adicionar fotos se existirem
+                        if (inspection.photos && inspection.photos[problema.photoKey]) {
+                            const fotos = inspection.photos[problema.photoKey];
+                            
+                            for (let j = 0; j < fotos.length; j++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    // CORREÇÃO: Usar foto.data se for objeto, ou foto diretamente se for string
+                                    const imageData = (typeof fotos[j] === 'object' && fotos[j].data) ? fotos[j].data : fotos[j];
+                                    
+                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`Foto ${j + 1} - ${problema.observacao}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto ao PDF:', error);
+                                    console.error('📷 Dados da foto:', fotos[j]);
+                                    console.error('📋 Tipo:', typeof fotos[j]);
+                                    doc.setFontSize(9);
+                                    doc.setTextColor(200, 0, 0);
+                                    doc.text(`[Erro ao carregar foto ${j + 1}]`, margin + 10, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    yPos += 6;
+                                }
+                            }
+                        } else {
+                            doc.setFontSize(9);
+                            doc.setTextColor(150, 150, 150);
+                            doc.text('(Sem fotos anexadas)', margin + 10, yPos);
+                            doc.setTextColor(0, 0, 0);
+                            doc.setFontSize(10);
+                            yPos += 6;
+                        }
+                        
+                        yPos += 8;
+                    }
                 } else {
                     checkPageBreak(20);
                     doc.setFontSize(14);
                     doc.setFont(undefined, 'bold');
                     doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
                     yPos += 10;
+                    
                     doc.setFontSize(10);
                     doc.setFont(undefined, 'normal');
                     doc.setTextColor(0, 150, 0);
-                    doc.text('✓ Nenhum problema identificado', margin, yPos);
+                    doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
                     doc.setTextColor(0, 0, 0);
                     yPos += 10;
+                }
+                
+                // FOTOS GERAIS
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    checkPageBreak(30);
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.setTextColor(102, 126, 234);
+                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
+                    doc.setTextColor(0, 0, 0);
+                    yPos += 10;
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            checkPageBreak(25);
+                            
+                            doc.setFontSize(11);
+                            doc.setFont(undefined, 'bold');
+                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
+                            yPos += 6;
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                checkPageBreak(90);
+                                
+                                try {
+                                    const imgWidth = 80;
+                                    const imgHeight = 60;
+                                    
+                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
+                                        fotoGeral.fotos[i].data : fotoGeral.fotos[i];
+                                    
+                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    
+                                    doc.setFontSize(9);
+                                    doc.setFont(undefined, 'italic');
+                                    doc.setTextColor(100, 100, 100);
+                                    doc.text(`Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    doc.setFont(undefined, 'normal');
+                                    
+                                    yPos += imgHeight + 10;
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto geral ao PDF:', error);
+                                    doc.setFontSize(9);
+                                    doc.setTextColor(200, 0, 0);
+                                    doc.text(`[Erro ao carregar foto ${i + 1}]`, margin + 10, yPos);
+                                    doc.setTextColor(0, 0, 0);
+                                    doc.setFontSize(10);
+                                    yPos += 6;
+                                }
+                            }
+                            
+                            yPos += 5;
+                        }
+                    }
                 }
                 
                 // Rodapé
