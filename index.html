@@ -924,35 +924,9 @@
             justify-content: space-between;
             margin-top: 20px;
         }
-    
-/* === Modal Câmera/Galeria (mínimo) === */
-.modal-min-photo{display:none;position:fixed;z-index:9999;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.5)}
-.modal-min-photo.active{display:flex;align-items:center;justify-content:center}
-.modal-min-content{background:#fff;padding:20px;border-radius:10px;max-width:360px;width:90%;box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.modal-min-content h3{margin:0 0 12px;color:#333;text-align:center}
-.modal-min-actions{display:grid;gap:10px}
-.btn-min{padding:12px;border:2px solid #667eea;border-radius:8px;background:#fff;cursor:pointer}
-.btn-min:hover{background:#667eea;color:#fff}
-.modal-min-close{position:absolute;right:12px;top:8px;font-size:22px;color:#888;cursor:pointer}
-
-</style>
+    </style>
 </head>
 <body>
-
-<!-- === Modal Mínimo de Foto === -->
-<div id="minPhotoModal" class="modal-min-photo">
-  <div class="modal-min-content">
-    <span class="modal-min-close" onclick="closeMinPhoto()">×</span>
-    <h3>Adicionar Foto</h3>
-    <div class="modal-min-actions">
-      <button class="btn-min" onclick="__chooseMinPhoto('camera')">📷 Tirar agora</button>
-      <button class="btn-min" onclick="__chooseMinPhoto('gallery')">🖼️ Escolher da galeria</button>
-    </div>
-  </div>
-</div>
-<input id="__minCam" type="file" accept="image/*" capture="environment" multiple style="display:none">
-<input id="__minGal" type="file" accept="image/*" multiple style="display:none">
-
     <div class="container">
         <div class="header">
             <h1>🏠 Sistema de Inspeção Residencial</h1>
@@ -2946,32 +2920,50 @@
         }
 
         // Add photo
-        function addPhoto(itemId){
-  // Guarda o contexto e abre o modal (sem alterar o fluxo antigo)
-  window.__minPhotoCtx = itemId;
-  const m = document.getElementById('minPhotoModal');
-  if(m){ m.classList.add('active'); }
-  else {
-    // fallback para comportamento antigo
+        function addPhoto(itemId) {
+    // Pergunta rápida: OK = Câmera, Cancelar = Galeria
+    const usarCamera = confirm('Deseja TIRAR a foto agora?
+OK = Câmera | Cancelar = Galeria');
+
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.multiple = true;
-    input.onchange = function(e){
-      const files = Array.from(e.target.files);
-      if (!photoData[itemId]) photoData[itemId] = [];
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(event){
-          photoData[itemId].push({ data: event.target.result, name: file.name });
-          if (typeof displayPhotos === 'function') displayPhotos(itemId);
-        };
-        reader.readAsDataURL(file);
-      });
+    if (usarCamera) {
+        try { input.setAttribute('capture', 'environment'); } catch (e) {}
+    }
+    input.onchange = function(e) {
+        const files = Array.from(e.target.files);
+        if (!window.photoData) window.photoData = {};
+        if (!photoData[itemId]) photoData[itemId] = [];
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                photoData[itemId].push({ data: event.target.result, name: file.name || ('foto_' + Date.now() + '.jpg') });
+                if (typeof displayPhotos === 'function') displayPhotos(itemId);
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = '';
     };
     input.click();
-  }
 }
+                
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        photoData[itemId].push({
+                            data: event.target.result,
+                            name: file.name
+                        });
+                        displayPhotos(itemId);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+            
+            input.click();
+        }
 
         // Display photos
         function displayPhotos(itemId) {
@@ -5347,43 +5339,5 @@ Ao continuar usando, você aceita estes termos.
             }
         });
     </script>
-
-<script>
-(function(){
-  window.__minPhotoCtx = null;
-  window.closeMinPhoto = function(){
-    const m = document.getElementById('minPhotoModal');
-    if(m) m.classList.remove('active');
-  };
-  window.__chooseMinPhoto = function(which){
-    const ctx = window.__minPhotoCtx;
-    if(!ctx){ closeMinPhoto(); return; }
-    closeMinPhoto();
-    const el = (which==='camera') ? document.getElementById('__minCam') : document.getElementById('__minGal');
-    if(el) el.click();
-  };
-  function handleFilesToOriginalCtx(fileList){
-    const itemId = window.__minPhotoCtx;
-    if(!itemId) return;
-    const files = Array.from(fileList||[]);
-    if(!window.photoData) window.photoData = {};
-    if(!window.photoData[itemId]) window.photoData[itemId] = [];
-    files.forEach(file=>{
-      if(!file.type || !file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = function(e){
-        window.photoData[itemId].push({ data: e.target.result, name: file.name || ('foto_'+Date.now()+'.jpg') });
-        if(typeof window.displayPhotos === 'function') window.displayPhotos(itemId);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-  const cam = document.getElementById('__minCam');
-  const gal = document.getElementById('__minGal');
-  if(cam) cam.addEventListener('change', e=>{ handleFilesToOriginalCtx(e.target.files); e.target.value=''; });
-  if(gal) gal.addEventListener('change', e=>{ handleFilesToOriginalCtx(e.target.files); e.target.value=''; });
-})();
-</script>
-
 </body>
 </html>
