@@ -924,9 +924,269 @@
             justify-content: space-between;
             margin-top: 20px;
         }
+
+        /* Modal de escolha de foto (Câmera ou Galeria) */
+        .photo-choice-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            animation: fadeIn 0.3s;
+        }
+
+        .photo-choice-modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-choice-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .photo-choice-content h3 {
+            margin-bottom: 25px;
+            color: #333;
+            font-size: 20px;
+        }
+
+        .photo-choice-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .photo-choice-btn {
+            padding: 18px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            background: white;
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .photo-choice-btn:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .photo-choice-btn.cancel {
+            border-color: #6c757d;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+
+        .photo-choice-btn.cancel:hover {
+            background: #6c757d;
+            color: white;
+        }
+
+        /* Modal da câmera */
+        .camera-modal {
+            display: none;
+            position: fixed;
+            z-index: 2100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.95);
+            animation: fadeIn 0.3s;
+        }
+
+        .camera-modal.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-container {
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .camera-video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1); /* Espelha a imagem para parecer espelho */
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            padding: 30px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .camera-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 4px solid white;
+            background: rgba(255,255,255,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            transition: all 0.3s;
+        }
+
+        .camera-btn:hover {
+            background: rgba(255,255,255,0.5);
+            transform: scale(1.1);
+        }
+
+        .camera-btn.capture {
+            background: white;
+            width: 80px;
+            height: 80px;
+        }
+
+        .camera-btn.close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,0,0,0.7);
+            border: 2px solid white;
+            font-size: 24px;
+        }
+
+        .camera-preview {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .camera-preview.active {
+            display: block;
+        }
+
+        .camera-preview img {
+            width: 100%;
+            height: auto;
+            display: block;
+            /* Imagem salva está correta (não espelhada) */
+        }
+
+        .camera-preview-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+            padding: 30px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .camera-preview-btn {
+            padding: 15px 30px;
+            border: 2px solid white;
+            border-radius: 25px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .camera-preview-btn:hover {
+            background: white;
+            color: #333;
+        }
+
+        .camera-preview-btn.use {
+            background: #28a745;
+            border-color: #28a745;
+        }
+
+        .camera-preview-btn.use:hover {
+            background: #218838;
+            border-color: #218838;
+        }
     </style>
 </head>
 <body>
+    <!-- Modal de escolha: Câmera ou Galeria -->
+    <div id="photoChoiceModal" class="photo-choice-modal">
+        <div class="photo-choice-content">
+            <h3>📸 Como deseja adicionar a foto?</h3>
+            <div class="photo-choice-buttons">
+                <button class="photo-choice-btn" onclick="openCamera()">
+                    📷 Tirar Foto
+                </button>
+                <button class="photo-choice-btn" onclick="openGallery()">
+                    🖼️ Escolher da Galeria
+                </button>
+                <button class="photo-choice-btn cancel" onclick="closePhotoChoiceModal()">
+                    ✖️ Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal da Câmera -->
+    <div id="cameraModal" class="camera-modal">
+        <div class="camera-container" id="cameraContainer">
+            <button class="camera-btn close" onclick="closeCamera()" title="Fechar">×</button>
+            <video id="cameraVideo" class="camera-video" autoplay playsinline></video>
+            <div class="camera-controls">
+                <button class="camera-btn capture" onclick="capturePhoto()" title="Tirar Foto">
+                    📸
+                </button>
+            </div>
+        </div>
+        <div class="camera-preview" id="cameraPreview">
+            <img id="capturedPhoto" alt="Foto capturada">
+            <div class="camera-preview-controls">
+                <button class="camera-preview-btn" onclick="retakePhoto()">🔄 Tirar Outra</button>
+                <button class="camera-preview-btn use" onclick="useCapturedPhoto()">✅ Usar Esta Foto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input oculto para galeria -->
+    <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;">
+
     <div class="container">
         <div class="header">
             <h1>🏠 Sistema de Inspeção Residencial</h1>
@@ -2919,51 +3179,194 @@
             }
         }
 
-        // Add photo
-        function addPhoto(itemId) {
-    // Pergunta rápida: OK = Câmera, Cancelar = Galeria
-    const usarCamera = confirm('Deseja TIRAR a foto agora?
-OK = Câmera | Cancelar = Galeria');
+        // Variáveis globais para câmera
+        let currentPhotoItemId = null;
+        let cameraStream = null;
+        let capturedPhotoData = null;
 
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.multiple = true;
-    if (usarCamera) {
-        try { input.setAttribute('capture', 'environment'); } catch (e) {}
-    }
-    input.onchange = function(e) {
-        const files = Array.from(e.target.files);
-        if (!window.photoData) window.photoData = {};
-        if (!photoData[itemId]) photoData[itemId] = [];
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                photoData[itemId].push({ data: event.target.result, name: file.name || ('foto_' + Date.now() + '.jpg') });
-                if (typeof displayPhotos === 'function') displayPhotos(itemId);
-            };
-            reader.readAsDataURL(file);
-        });
-        e.target.value = '';
-    };
-    input.click();
-}
+        // Add photo - Mostra modal de escolha
+        function addPhoto(itemId) {
+            currentPhotoItemId = itemId;
+            showPhotoChoiceModal();
+        }
+
+        // Mostrar modal de escolha (Câmera ou Galeria)
+        function showPhotoChoiceModal() {
+            const modal = document.getElementById('photoChoiceModal');
+            modal.classList.add('active');
+        }
+
+        // Fechar modal de escolha
+        function closePhotoChoiceModal() {
+            const modal = document.getElementById('photoChoiceModal');
+            modal.classList.remove('active');
+            currentPhotoItemId = null;
+        }
+
+        // Abrir galeria (funcionalidade original)
+        function openGallery() {
+            closePhotoChoiceModal();
+            const input = document.getElementById('galleryInput');
+            input.value = ''; // Reset do input
+            
+            input.onchange = function(e) {
+                const files = Array.from(e.target.files);
+                
+                if (!photoData[currentPhotoItemId]) {
+                    photoData[currentPhotoItemId] = [];
+                }
                 
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        photoData[itemId].push({
+                        photoData[currentPhotoItemId].push({
                             data: event.target.result,
                             name: file.name
                         });
-                        displayPhotos(itemId);
+                        displayPhotos(currentPhotoItemId);
                     };
                     reader.readAsDataURL(file);
                 });
+                
+                currentPhotoItemId = null;
             };
             
             input.click();
         }
+
+        // Abrir câmera frontal
+        async function openCamera() {
+            closePhotoChoiceModal();
+            
+            const cameraModal = document.getElementById('cameraModal');
+            const video = document.getElementById('cameraVideo');
+            const cameraContainer = document.getElementById('cameraContainer');
+            const cameraPreview = document.getElementById('cameraPreview');
+            
+            // Mostrar modal da câmera
+            cameraModal.classList.add('active');
+            cameraContainer.style.display = 'block';
+            cameraPreview.classList.remove('active');
+            
+            try {
+                // Solicitar acesso à câmera frontal
+                const constraints = {
+                    video: {
+                        facingMode: 'user', // Câmera frontal
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = cameraStream;
+                
+            } catch (error) {
+                console.error('Erro ao acessar câmera:', error);
+                alert('⚠️ Não foi possível acessar a câmera. Verifique as permissões do navegador.\n\n' + error.message);
+                closeCamera();
+            }
+        }
+
+        // Fechar câmera
+        function closeCamera() {
+            const cameraModal = document.getElementById('cameraModal');
+            cameraModal.classList.remove('active');
+            
+            // Parar o stream da câmera
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            // Limpar video
+            const video = document.getElementById('cameraVideo');
+            video.srcObject = null;
+            
+            // Resetar preview
+            const cameraPreview = document.getElementById('cameraPreview');
+            cameraPreview.classList.remove('active');
+            capturedPhotoData = null;
+            currentPhotoItemId = null;
+        }
+
+        // Capturar foto
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Definir tamanho do canvas igual ao vídeo
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Desenhar frame do vídeo no canvas
+            // O vídeo aparece espelhado no CSS, mas salvamos a imagem normal (não espelhada)
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Converter para base64
+            capturedPhotoData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // Mostrar preview (o CSS do preview espelha novamente para consistência visual)
+            const cameraContainer = document.getElementById('cameraContainer');
+            const cameraPreview = document.getElementById('cameraPreview');
+            const capturedPhoto = document.getElementById('capturedPhoto');
+            
+            capturedPhoto.src = capturedPhotoData;
+            cameraContainer.style.display = 'none';
+            cameraPreview.classList.add('active');
+        }
+
+        // Tirar outra foto (voltar para câmera)
+        function retakePhoto() {
+            const cameraContainer = document.getElementById('cameraContainer');
+            const cameraPreview = document.getElementById('cameraPreview');
+            
+            cameraPreview.classList.remove('active');
+            cameraContainer.style.display = 'block';
+            capturedPhotoData = null;
+        }
+
+        // Usar foto capturada
+        function useCapturedPhoto() {
+            if (!capturedPhotoData || !currentPhotoItemId) {
+                alert('⚠️ Erro ao processar foto.');
+                return;
+            }
+            
+            // Adicionar foto aos dados
+            if (!photoData[currentPhotoItemId]) {
+                photoData[currentPhotoItemId] = [];
+            }
+            
+            photoData[currentPhotoItemId].push({
+                data: capturedPhotoData,
+                name: `foto_${Date.now()}.jpg`
+            });
+            
+            // Atualizar display
+            displayPhotos(currentPhotoItemId);
+            
+            // Fechar câmera
+            closeCamera();
+            
+            // Feedback
+            playSound('success');
+        }
+
+        // Fechar modais ao clicar fora
+        window.addEventListener('click', function(event) {
+            const photoChoiceModal = document.getElementById('photoChoiceModal');
+            const cameraModal = document.getElementById('cameraModal');
+            
+            // Fechar modal de escolha se clicar fora
+            if (event.target === photoChoiceModal) {
+                closePhotoChoiceModal();
+            }
+            
+            // Não fechar modal da câmera ao clicar fora (para evitar perder a foto)
+            // O usuário deve usar o botão de fechar
+        });
 
         // Display photos
         function displayPhotos(itemId) {
