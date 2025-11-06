@@ -925,41 +925,38 @@
             margin-top: 20px;
         }
     
-/* ===== ESTILOS PARA CÂMERA E GALERIA (GUIA) ===== */
-.photo-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background-color:rgba(0,0,0,0.5)}
-.photo-modal-content{background-color:#fff;margin:10% auto;padding:20px;border-radius:10px;width:90%;max-width:420px;box-shadow:0 4px 6px rgba(0,0,0,0.3)}
+/* ===== ESTILOS PARA CÂMERA E GALERIA (modal escolha) ===== */
+.photo-modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5)}
+.photo-modal-content{background:#fff;margin:10% auto;padding:20px;border-radius:10px;width:90%;max-width:420px;box-shadow:0 4px 6px rgba(0,0,0,0.3)}
 .photo-modal h3{margin-top:0;color:#333;text-align:center}
 .photo-options{display:flex;flex-direction:column;gap:15px;margin-top:20px}
-.photo-option-btn{padding:15px;border:2px solid #007bff;border-radius:8px;background-color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:16px;transition:all .3s}
-.photo-option-btn:hover{background-color:#007bff;color:#fff}
+.photo-option-btn{padding:15px;border:2px solid #007bff;border-radius:8px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:16px;transition:all .3s}
+.photo-option-btn:hover{background:#007bff;color:#fff}
 .photo-option-btn i{font-size:24px}
 .close-modal{color:#aaa;float:right;font-size:28px;font-weight:700;cursor:pointer}
 .close-modal:hover{color:#000}
-.hidden-input{display:none}
 
 </style>
 </head>
 <body>
 
-<!-- ===== Modal para escolher tipo de foto (GUIA) ===== -->
+<!-- ===== Modal: escolher Câmera ou Galeria ===== -->
 <div id="photoModal" class="photo-modal">
   <div class="photo-modal-content">
     <span class="close-modal" onclick="closePhotoModal()">&times;</span>
     <h3>📸 Adicionar Foto</h3>
     <div class="photo-options">
-      <button class="photo-option-btn" onclick="openCamera()">
+      <button class="photo-option-btn" onclick="chooseCamera()">
         <i>📷</i>
         <div><strong>Tirar Foto</strong><div style="font-size:12px;color:#666">Abrir câmera</div></div>
       </button>
-      <button class="photo-option-btn" onclick="openGallery()">
+      <button class="photo-option-btn" onclick="chooseGallery()">
         <i>🖼️</i>
         <div><strong>Escolher da Galeria</strong><div style="font-size:12px;color:#666">Selecionar foto existente</div></div>
       </button>
     </div>
   </div>
 </div>
-<input type="file" id="cameraInput" class="hidden-input" accept="image/*" capture="environment" multiple>
-<input type="file" id="galleryInput" class="hidden-input" accept="image/*" multiple>
 
     <div class="container">
         <div class="header">
@@ -2955,18 +2952,14 @@
 
         // Add photo
         function addPhoto(itemId) {
-    // Abre modal com opções Câmera / Galeria e lembra o contexto
-    window.currentPhotoContextId = itemId;
-    if (typeof showPhotoModal === 'function') {
-        showPhotoModal(itemId);
+    // Abre o modal para escolher Câmera ou Galeria
+    window.__currentAddPhotoId = itemId;
+    const modal = document.getElementById('photoModal');
+    if (modal) {
+        modal.style.display = 'block';
     } else {
-        // fallback: abrir galeria se modal não existir por algum motivo
-        const el = document.getElementById('galleryInput');
-        if (el) {
-            // cria um listener temporário para atribuir ao contexto
-            window.currentPhotoContextId = itemId;
-            el.click();
-        }
+        // Fallback para comportamento antigo (galeria)
+        spawnFileInputAndProcess(itemId, { capture: false });
     }
 }
 
@@ -5344,142 +5337,5 @@ Ao continuar usando, você aceita estes termos.
             }
         });
     </script>
-
-<script>
-// ===== Integração Câmera/Galeria com o botão existente =====
-(function(){
-  window.currentPhotoContextId = null;
-
-  window.showPhotoModal = function(ctx){
-    window.currentPhotoContextId = ctx || window.currentPhotoContextId || 'geral';
-    const modal = document.getElementById('photoModal');
-    if(modal) modal.style.display = 'block';
-  };
-  window.closePhotoModal = function(){
-    const modal = document.getElementById('photoModal');
-    if(modal) modal.style.display = 'none';
-  };
-  window.openCamera = function(){
-    closePhotoModal();
-    const el = document.getElementById('cameraInput');
-    if(el) el.click();
-  };
-  window.openGallery = function(){
-    closePhotoModal();
-    const el = document.getElementById('galleryInput');
-    if(el) el.click();
-  };
-
-  function dataURLtoBlob(dataurl) {
-      const arr = dataurl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while(n--) u8arr[n] = bstr.charCodeAt(n);
-      return new Blob([u8arr], {type:mime});
-  }
-
-  // Fila de upload para o Drive
-  window.drivePhotoQueue = window.drivePhotoQueue || [];
-  function queuePhotoForDriveUpload(dataUrl, filename){
-      try{
-          const blob = dataURLtoBlob(dataUrl);
-          window.drivePhotoQueue.push({ blob, name: filename || ('foto_'+Date.now()+'.jpg'), itemId: window.currentPhotoContextId, dataUrl });
-      }catch(e){
-          console.error('Falha ao enfileirar foto para upload', e);
-      }
-  }
-
-  async function uploadBlobToDrive(blob, name, parentId){
-      if(!(window.gapi && gapi.client && gapi.client.drive)){
-          console.warn('gapi drive não carregado ainda.');
-          throw new Error('Drive API não carregada');
-      }
-      const metadata = { name: name, mimeType: blob.type || 'image/jpeg', parents: parentId ? [parentId] : undefined };
-      const boundary = 'foo_bar_' + Math.random().toString(36).slice(2);
-      const delimiter = '\r\n--' + boundary + '\r\n';
-      const closeDelim = '\r\n--' + boundary + '--';
-      const reader = await blob.arrayBuffer();
-      const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(reader)));
-      const body = delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-          JSON.stringify(metadata) + '\r\n' +
-          delimiter + 'Content-Type: ' + (blob.type || 'image/jpeg') + '\r\nContent-Transfer-Encoding: base64\r\n\r\n' +
-          base64Data + closeDelim;
-      const res = await gapi.client.request({
-          path: '/upload/drive/v3/files',
-          method: 'POST',
-          params: { uploadType: 'multipart' },
-          headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
-          body: body
-      });
-      return res;
-  }
-
-  async function ensureParentFolder(){
-      const shared = (localStorage.getItem('sharedFolderId') || '').trim();
-      if(shared) return shared;
-      return null;
-  }
-
-  async function uploadQueuedPhotosToDrive(){
-      const parentId = await ensureParentFolder();
-      const queue = window.drivePhotoQueue || [];
-      for(let i=0;i<queue.length;i++){
-          const item = queue[i];
-          try{
-              await uploadBlobToDrive(item.blob, item.name, parentId);
-              queue.splice(i,1); i--;
-          }catch(e){
-              console.error('Falha ao subir foto para o Drive:', e);
-          }
-      }
-  }
-  window.uploadQueuedPhotosToDrive = uploadQueuedPhotosToDrive;
-
-  if(typeof window.syncWithDrive === 'function'){
-      const _origSync = window.syncWithDrive;
-      window.syncWithDrive = async function(){
-          const r = await _origSync.apply(this, arguments);
-          await uploadQueuedPhotosToDrive();
-          return r;
-      };
-  }
-
-  function handleSelectedFiles(fileList){
-      const itemId = window.currentPhotoContextId;
-      if(!itemId){ console.warn('Sem contexto de foto definido'); return; }
-
-      const files = Array.from(fileList || []);
-      if (!window.photoData) window.photoData = {};
-      if (!window.photoData[itemId]) window.photoData[itemId] = [];
-
-      files.forEach(file => {
-        if(!file || !file.type || !file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = function(evt){
-            const dataUrl = evt.target.result;
-            window.photoData[itemId].push({ data: dataUrl, name: file.name || ('foto_'+Date.now()+'.jpg') });
-            if (typeof window.displayPhotos === 'function') {
-                window.displayPhotos(itemId);
-            }
-            queuePhotoForDriveUpload(dataUrl, file.name || ('foto_'+Date.now()+'.jpg'));
-        };
-        reader.readAsDataURL(file);
-      });
-  }
-
-  const cam = document.getElementById('cameraInput');
-  const gal = document.getElementById('galleryInput');
-  if(cam) cam.addEventListener('change', e => { handleSelectedFiles(e.target.files); e.target.value=''; });
-  if(gal) gal.addEventListener('change', e => { handleSelectedFiles(e.target.files); e.target.value=''; });
-
-  document.addEventListener('click', function(ev){
-      const modal = document.getElementById('photoModal');
-      if(ev.target === modal){ closePhotoModal(); }
-  });
-})();
-</script>
-
 </body>
 </html>
