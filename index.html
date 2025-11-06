@@ -924,9 +924,114 @@
             justify-content: space-between;
             margin-top: 20px;
         }
-    </style>
+    
+/* ===== ESTILOS PARA CÂMERA E GALERIA (GUIA) ===== */
+.photo-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+.photo-modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+.photo-modal h3 {
+    margin-top: 0;
+    color: #333;
+    text-align: center;
+}
+.photo-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+}
+.photo-option-btn {
+    padding: 15px;
+    border: 2px solid #007bff;
+    border-radius: 8px;
+    background-color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+.photo-option-btn:hover { background-color: #007bff; color: white; }
+.photo-option-btn i { font-size: 24px; }
+.close-modal {
+    color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;
+}
+.close-modal:hover { color: #000; }
+.hidden-input { display: none; }
+.photo-container {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+}
+.photo-preview {
+    position: relative; width: 100px; height: 100px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;
+}
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.remove-photo {
+    position: absolute; top: 5px; right: 5px; background-color: rgba(255, 0, 0, 0.8);
+    color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+.add-photo-btn {
+    padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; gap: 8px;
+}
+.add-photo-btn:hover { background-color: #218838; }
+
+</style>
 </head>
 <body>
+
+<!-- ===== Modal para escolher tipo de foto (GUIA) ===== -->
+<div id="photoModal" class="photo-modal">
+    <div class="photo-modal-content">
+        <span class="close-modal" onclick="closePhotoModal()">&times;</span>
+        <h3>📸 Adicionar Foto</h3>
+        <div class="photo-options">
+            <button class="photo-option-btn" onclick="openCamera()">
+                <i>📷</i>
+                <div>
+                    <strong>Tirar Foto</strong>
+                    <div style="font-size: 12px; color: #666;">Abrir câmera</div>
+                </div>
+            </button>
+            <button class="photo-option-btn" onclick="openGallery()">
+                <i>🖼️</i>
+                <div>
+                    <strong>Escolher da Galeria</strong>
+                    <div style="font-size: 12px; color: #666;">Selecionar foto existente</div>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Inputs escondidos para captura de fotos (GUIA) -->
+<input type="file" id="cameraInput" class="hidden-input" accept="image/*" capture="environment" multiple>
+<input type="file" id="galleryInput" class="hidden-input" accept="image/*" multiple>
+
+<!-- Seção global de fotos/atalho (não interfere no seu layout atual) -->
+<div id="photoGlobalSection" style="display:none; margin: 15px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <h3 style="margin:0; color:#333;">🖼️ Fotos recentes</h3>
+        <button class="add-photo-btn" onclick="showPhotoModal('geral')">📸 Adicionar Fotos</button>
+    </div>
+    <div id="photos-geral" class="photo-container"></div>
+</div>
+
     <div class="container">
         <div class="header">
             <h1>🏠 Sistema de Inspeção Residencial</h1>
@@ -5323,5 +5428,225 @@ Ao continuar usando, você aceita estes termos.
             }
         });
     </script>
+
+<script>
+// ===== SISTEMA DE CÂMERA + GALERIA com integração ao Drive (GUIA) =====
+(function(){
+    window.fotosInspecao = window.fotosInspecao || {}; // { contexto: [ {data, nome, timestamp} ] }
+    window.drivePhotoQueue = window.drivePhotoQueue || []; // fila de uploads para o Drive
+
+    let currentPhotoContext = 'geral';
+
+    window.showPhotoModal = function(context='geral'){
+        currentPhotoContext = context || 'geral';
+        const modal = document.getElementById('photoModal');
+        if(modal){ modal.style.display = 'block'; }
+    };
+    window.closePhotoModal = function(){
+        const modal = document.getElementById('photoModal');
+        if(modal){ modal.style.display = 'none'; }
+    };
+    window.openCamera = function(){
+        closePhotoModal();
+        const el = document.getElementById('cameraInput');
+        if(el) el.click();
+    };
+    window.openGallery = function(){
+        closePhotoModal();
+        const el = document.getElementById('galleryInput');
+        if(el) el.click();
+    };
+
+    function ensureContext(context){
+        if(!window.fotosInspecao[context]) window.fotosInspecao[context] = [];
+    }
+
+    function renderPhotoPreview(dataUrl, context){
+        const globalSection = document.getElementById('photoGlobalSection');
+        if(globalSection) globalSection.style.display = 'block';
+        const containerId = `photos-${context}`;
+        let container = document.getElementById(containerId);
+        if(!container){
+            // tenta achar um container específico; se não existir, usa o global "geral"
+            container = document.getElementById('photos-geral');
+        }
+        if(!container) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'photo-preview';
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        const btn = document.createElement('button');
+        btn.className = 'remove-photo';
+        btn.textContent = '×';
+        btn.title = 'Remover foto';
+        btn.onclick = ()=>{
+            wrap.remove();
+            // remove do array também
+            const arr = window.fotosInspecao[context] || [];
+            const idx = arr.findIndex(it => it.data === dataUrl);
+            if(idx >= 0){ arr.splice(idx,1); }
+            // também remove da fila se existir
+            const qIdx = window.drivePhotoQueue.findIndex(it => it.dataUrl === dataUrl);
+            if(qIdx >= 0){ window.drivePhotoQueue.splice(qIdx,1); }
+        };
+        wrap.appendChild(img);
+        wrap.appendChild(btn);
+        container.appendChild(wrap);
+    }
+
+    function dataURLtoBlob(dataurl) {
+        const arr = dataurl.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+        return new Blob([u8arr], {type:mime});
+    }
+
+    function queuePhotoForDriveUpload(dataUrl, filename, context){
+        try{
+            const blob = dataURLtoBlob(dataUrl);
+            window.drivePhotoQueue.push({
+                blob, name: filename || ('foto_'+Date.now()+'.jpg'), context, dataUrl
+            });
+            // dispara um evento que outros trechos do sistema podem ouvir
+            document.dispatchEvent(new CustomEvent('photo-queued', { detail: { context, name: filename } }));
+        }catch(e){
+            console.error('Falha ao enfileirar foto para upload', e);
+        }
+    }
+
+    async function uploadBlobToDrive(blob, name, parentId){
+        if(!(window.gapi && gapi.client && gapi.client.drive)){
+            console.warn('gapi drive não carregado ainda.');
+            throw new Error('Drive API não carregada');
+        }
+        const metadata = {
+            name: name,
+            mimeType: blob.type || 'image/jpeg',
+            parents: parentId ? [parentId] : undefined
+        };
+        const boundary = 'foo_bar_baz_' + Math.random().toString(36).slice(2);
+        const delimiter = '\r\n--' + boundary + '\r\n';
+        const closeDelim = '\r\n--' + boundary + '--';
+
+        const reader = await blob.arrayBuffer();
+        const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(reader)));
+        const body =
+            delimiter +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+            JSON.stringify(metadata) + '\r\n' +
+            delimiter +
+            'Content-Type: ' + (blob.type || 'image/jpeg') + '\r\n' +
+            'Content-Transfer-Encoding: base64\r\n\r\n' +
+            base64Data + closeDelim;
+
+        const res = await gapi.client.request({
+            path: '/upload/drive/v3/files',
+            method: 'POST',
+            params: { uploadType: 'multipart' },
+            headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+            body: body
+        });
+        return res;
+    }
+
+    async function ensureParentFolder(){
+        // tenta usar pasta compartilhada configurada no app
+        const shared = (localStorage.getItem('sharedFolderId') || '').trim();
+        if(shared) return shared;
+        // caso não exista, não cria nada aqui (deixar na raiz) para evitar mudanças invasivas
+        return null;
+    }
+
+    async function uploadQueuedPhotosToDrive(){
+        const parentId = await ensureParentFolder();
+        const queue = window.drivePhotoQueue || [];
+        for(let i=0;i<queue.length;i++){
+            const item = queue[i];
+            try{
+                await uploadBlobToDrive(item.blob, item.name, parentId);
+                // remove da fila após sucesso
+                queue.splice(i,1); i--;
+            }catch(e){
+                console.error('Falha ao subir foto para o Drive:', e);
+                // mantém na fila para tentar depois
+            }
+        }
+        document.dispatchEvent(new Event('photos-drive-synced'));
+    }
+    window.uploadQueuedPhotosToDrive = uploadQueuedPhotosToDrive; // expõe função manual
+
+    // se existir a função original de sync do seu sistema, anexamos nossa fila de fotos
+    if(typeof window.syncWithDrive === 'function'){
+        const _origSync = window.syncWithDrive;
+        window.syncWithDrive = async function(){
+            try{
+                const r = await _origSync.apply(this, arguments);
+                await uploadQueuedPhotosToDrive();
+                return r;
+            }catch(e){
+                console.error('Erro no sync + upload de fotos:', e);
+                throw e;
+            }
+        };
+    }
+
+    function handleFiles(files){
+        for (let file of files) {
+            if (file && file.type && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e){
+                    const dataUrl = e.target.result;
+                    const context = currentPhotoContext || 'geral';
+
+                    ensureContext(context);
+                    window.fotosInspecao[context].push({
+                        data: dataUrl, nome: file.name || ('foto_'+Date.now()+'.jpg'),
+                        timestamp: new Date().toISOString()
+                    });
+
+                    // exibe imediatamente
+                    renderPhotoPreview(dataUrl, context);
+
+                    // prepara para upload no Drive
+                    const safeName = (file.name && file.name.split(/[/\\]/).pop()) || ('foto_'+Date.now()+'.jpg');
+                    queuePhotoForDriveUpload(dataUrl, safeName, context);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    }
+
+    document.addEventListener('click', function(ev){
+        const modal = document.getElementById('photoModal');
+        if(ev.target === modal){ closePhotoModal(); }
+    });
+
+    const cam = document.getElementById('cameraInput');
+    const gal = document.getElementById('galleryInput');
+    if(cam) cam.addEventListener('change', e => { handleFiles(e.target.files); e.target.value=''; });
+    if(gal) gal.addEventListener('change', e => { handleFiles(e.target.files); e.target.value=''; });
+
+    // opção: botão flutuante na tela de inspeção (caso o layout não tenha botões de foto ainda)
+    function injectFloatingAddPhoto(){
+        if(document.getElementById('floatingAddPhotoBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'floatingAddPhotoBtn';
+        btn.className = 'add-photo-btn';
+        btn.style.position = 'fixed';
+        btn.style.bottom = '20px';
+        btn.style.right = '20px';
+        btn.style.zIndex = '999';
+        btn.title = 'Adicionar fotos (câmera/galeria)';
+        btn.textContent = '📸 Adicionar Fotos';
+        btn.onclick = ()=>window.showPhotoModal('geral');
+        document.body.appendChild(btn);
+    }
+    window.addEventListener('load', injectFloatingAddPhoto);
+})();
+</script>
+
 </body>
 </html>
