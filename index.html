@@ -2461,32 +2461,38 @@
 
         // Deletar inspeção do Google Drive
         async function deleteInspectionFromDrive(inspection) {
-            if (!accessToken) {
-                throw new Error('Não conectado ao Google Drive');
-            }
+            // Se a inspeção tem driveFolderId, deletar do Drive
+            if (inspection.driveFolderId && accessToken) {
+                try {
+                    // Deletar a pasta inteira (que contém o JSON, relatório e fotos)
+                    await gapi.client.drive.files.delete({
+                        fileId: inspection.driveFolderId
+                    });
 
-            if (!inspection.driveFolderId) {
-                throw new Error('ID da pasta no Drive não encontrado');
-            }
-
-            try {
-                // Deletar a pasta inteira (que contém o JSON, relatório e fotos)
-                await gapi.client.drive.files.delete({
-                    fileId: inspection.driveFolderId
-                });
-
-                console.log('✅ Pasta deletada do Drive:', inspection.driveFolderId);
-                
-                // Remover do array local
-                const index = inspections.findIndex(i => i.id === inspection.id);
-                if (index > -1) {
-                    inspections.splice(index, 1);
-                    localStorage.setItem('inspections', JSON.stringify(inspections));
+                    console.log('✅ Pasta deletada do Drive:', inspection.driveFolderId);
+                } catch (error) {
+                    console.error('❌ Erro ao deletar do Drive:', error);
+                    // Continuar mesmo se falhar no Drive, para remover localmente
+                    if (error.status === 404) {
+                        console.warn('⚠️ Pasta não encontrada no Drive (pode já ter sido deletada)');
+                    } else {
+                        throw new Error('Erro ao deletar do Google Drive: ' + error.message);
+                    }
                 }
-                
-            } catch (error) {
-                console.error('❌ Erro ao deletar do Drive:', error);
-                throw error;
+            } else if (!accessToken) {
+                console.log('ℹ️ Não conectado ao Drive, deletando apenas localmente');
+            } else {
+                console.log('ℹ️ Inspeção não tem driveFolderId, deletando apenas localmente');
+            }
+            
+            // SEMPRE remover do array local, independente de ter driveFolderId
+            const index = inspections.findIndex(i => i.id === inspection.id);
+            if (index > -1) {
+                inspections.splice(index, 1);
+                localStorage.setItem('inspections', JSON.stringify(inspections));
+                console.log('✅ Inspeção removida localmente');
+            } else {
+                console.warn('⚠️ Inspeção não encontrada no array local');
             }
         }
 
@@ -4415,9 +4421,10 @@
             const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
             const addressFolderId = await findOrCreateFolder(addressFolder, dateFolderId);
 
-            // Save JSON
+            // Save JSON e obter o fileId
             const jsonContent = JSON.stringify(inspection, null, 2);
-            await uploadFile(jsonContent, 'inspecao.json', addressFolderId, 'application/json');
+            const jsonFileResult = await uploadFile(jsonContent, 'inspecao.json', addressFolderId, 'application/json');
+            const jsonFileId = jsonFileResult.id;
 
             // Save report
             const reportContent = createInspectionReport(inspection);
@@ -4426,6 +4433,19 @@
             // Save photos if any
             if (Object.keys(photoData).length > 0) {
                 await savePhotos(inspection, addressFolderId);
+            }
+
+            // IMPORTANTE: Atualizar o objeto da inspeção com os IDs do Drive
+            inspection.driveFolderId = addressFolderId;
+            inspection.driveFileId = jsonFileId;
+
+            // Atualizar no array de inspeções
+            const index = inspections.findIndex(i => i.id === inspection.id);
+            if (index > -1) {
+                inspections[index] = inspection;
+                // Salvar no localStorage com os IDs atualizados
+                localStorage.setItem('inspections', JSON.stringify(inspections));
+                console.log('✅ Inspeção atualizada com IDs do Drive:', inspection.id);
             }
         }
 
@@ -4490,39 +4510,74 @@
                 body: formData
             });
 
-            return response.json();
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: { message: 'Erro desconhecido' } }));
+                throw new Error(`Erro ao fazer upload: ${errorData.error?.message || response.statusText}`);
+            }
+
+            const result = await response.json();
+            if (!result.id) {
+                throw new Error('Upload realizado mas ID do arquivo não retornado');
+            }
+
+            return result;
         }
 
         // Save photos
         async function savePhotos(inspection, parentFolderId) {
+            if (!photoData || Object.keys(photoData).length === 0) {
+                console.log('ℹ️ Nenhuma foto para salvar');
+                return;
+            }
+
             const photosFolderId = await findOrCreateFolder('fotos', parentFolderId);
 
             for (const [itemId, photos] of Object.entries(photoData)) {
-                if (photos.length > 0) {
+                if (photos && photos.length > 0) {
                     const itemFolderId = await findOrCreateFolder(itemId, photosFolderId);
 
                     for (let i = 0; i < photos.length; i++) {
                         const photo = photos[i];
-                        const response = await fetch(photo.data);
-                        const blob = await response.blob();
-                        const fileName = `foto_${i + 1}.jpg`;
+                        if (!photo || !photo.data) {
+                            console.warn(`⚠️ Foto ${i + 1} do item ${itemId} está vazia, pulando...`);
+                            continue;
+                        }
 
-                        const metadata = {
-                            name: fileName,
-                            parents: [itemFolderId]
-                        };
+                        try {
+                            const response = await fetch(photo.data);
+                            if (!response.ok) {
+                                throw new Error(`Erro ao buscar foto: ${response.statusText}`);
+                            }
+                            const blob = await response.blob();
+                            const fileName = `foto_${i + 1}.jpg`;
 
-                        const formData = new FormData();
-                        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                        formData.append('file', blob);
+                            const metadata = {
+                                name: fileName,
+                                parents: [itemFolderId]
+                            };
 
-                        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`
-                            },
-                            body: formData
-                        });
+                            const formData = new FormData();
+                            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                            formData.append('file', blob);
+
+                            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`
+                                },
+                                body: formData
+                            });
+
+                            if (!uploadResponse.ok) {
+                                const errorData = await uploadResponse.json().catch(() => ({ error: { message: 'Erro desconhecido' } }));
+                                throw new Error(`Erro ao fazer upload da foto: ${errorData.error?.message || uploadResponse.statusText}`);
+                            }
+
+                            console.log(`✅ Foto ${i + 1} do item ${itemId} salva com sucesso`);
+                        } catch (error) {
+                            console.error(`❌ Erro ao salvar foto ${i + 1} do item ${itemId}:`, error);
+                            // Continuar com as outras fotos mesmo se uma falhar
+                        }
                     }
                 }
             }
@@ -5574,23 +5629,58 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
             showProgress('Sincronizando com Google Drive...');
             
             try {
-                const inspections = JSON.parse(localStorage.getItem('inspections')) || [];
+                const localInspections = JSON.parse(localStorage.getItem('inspections')) || [];
                 let syncCount = 0;
+                let errorCount = 0;
+                const errors = [];
                 
-                for (const inspection of inspections) {
-                    await saveToGoogleDrive(inspection);
-                    syncCount++;
+                for (const inspection of localInspections) {
+                    try {
+                        // Só sincronizar se não tiver driveFolderId (não foi salva no Drive ainda)
+                        if (!inspection.driveFolderId) {
+                            await saveToGoogleDrive(inspection);
+                            syncCount++;
+                        } else {
+                            console.log(`ℹ️ Inspeção ${inspection.id} já está no Drive, pulando...`);
+                        }
+                    } catch (error) {
+                        errorCount++;
+                        errors.push(`${inspection.endereco}, ${inspection.numero}: ${error.message}`);
+                        console.error(`❌ Erro ao sincronizar inspeção ${inspection.id}:`, error);
+                        // Continuar com as outras inspeções mesmo se uma falhar
+                    }
                 }
                 
                 hideProgress();
                 localStorage.setItem('lastSync', new Date().toISOString());
-                document.getElementById('lastSyncTime').textContent = new Date().toLocaleString('pt-BR');
-                playSound('success');
-                alert(`✅ ${syncCount} inspeção(ões) sincronizada(s) com sucesso!`);
+                const lastSyncElement = document.getElementById('lastSyncTime');
+                if (lastSyncElement) {
+                    lastSyncElement.textContent = new Date().toLocaleString('pt-BR');
+                }
+                
+                if (syncCount > 0) {
+                    playSound('success');
+                }
+                
+                let message = '';
+                if (syncCount > 0) {
+                    message += `✅ ${syncCount} inspeção(ões) sincronizada(s) com sucesso!\n\n`;
+                }
+                if (errorCount > 0) {
+                    message += `⚠️ ${errorCount} inspeção(ões) com erro:\n${errors.slice(0, 3).join('\n')}`;
+                    if (errors.length > 3) {
+                        message += `\n... e mais ${errors.length - 3} erro(s)`;
+                    }
+                }
+                if (syncCount === 0 && errorCount === 0) {
+                    message = 'ℹ️ Todas as inspeções já estão sincronizadas!';
+                }
+                
+                alert(message || '✅ Sincronização concluída!');
             } catch (error) {
                 hideProgress();
                 console.error('Erro ao sincronizar:', error);
-                alert('❌ Erro ao sincronizar. Tente novamente.');
+                alert('❌ Erro ao sincronizar: ' + error.message);
             }
         }
 
