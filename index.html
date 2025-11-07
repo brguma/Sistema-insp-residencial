@@ -1130,19 +1130,21 @@
             padding: 30px 20px;
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .camera-preview-btn {
-            padding: 15px 30px;
+            padding: 12px 20px;
             border: 2px solid white;
             border-radius: 25px;
             background: rgba(255,255,255,0.2);
             color: white;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            white-space: nowrap;
         }
 
         .camera-preview-btn:hover {
@@ -1195,6 +1197,7 @@
             <img id="capturedPhoto" alt="Foto capturada">
             <div class="camera-preview-controls">
                 <button class="camera-preview-btn" onclick="retakePhoto()">🔄 Tirar Outra</button>
+                <button class="camera-preview-btn" onclick="saveToGalleryAndOpen()">💾 Salvar e Abrir Galeria</button>
                 <button class="camera-preview-btn use" onclick="useCapturedPhoto()">✅ Usar Esta Foto</button>
             </div>
         </div>
@@ -3230,41 +3233,73 @@
 
         // Abrir galeria (funcionalidade original)
         function openGallery() {
+            // Salvar itemId ANTES de fechar o modal
+            const itemIdToUse = currentPhotoItemId;
+            
+            if (!itemIdToUse) {
+                alert('⚠️ Erro: contexto da foto não encontrado. Tente adicionar a foto novamente.');
+                closePhotoChoiceModal(true);
+                return;
+            }
+            
             closePhotoChoiceModal(false); // Não limpar itemId ainda
+            
             const input = document.getElementById('galleryInput');
             input.value = ''; // Reset do input
+            
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
+            if (!window.photoData[itemIdToUse]) {
+                window.photoData[itemIdToUse] = [];
+            }
             
             input.onchange = function(e) {
                 const files = Array.from(e.target.files);
                 
-                // Garantir que photoData existe
-                if (typeof window.photoData === 'undefined') {
-                    window.photoData = {};
+                if (files.length === 0) {
+                    // Se não selecionou nenhum arquivo, limpar itemId
+                    currentPhotoItemId = null;
+                    return;
                 }
                 
-                if (!window.photoData[currentPhotoItemId]) {
-                    window.photoData[currentPhotoItemId] = [];
-                }
+                console.log('📸 Processando', files.length, 'foto(s) da galeria para itemId:', itemIdToUse);
                 
-                // Salvar itemId antes de processar arquivos
-                const itemIdToUse = currentPhotoItemId;
+                let processedCount = 0;
                 
-                files.forEach(file => {
+                files.forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = function(event) {
                         window.photoData[itemIdToUse].push({
                             data: event.target.result,
                             name: file.name
                         });
+                        
+                        processedCount++;
+                        console.log(`✅ Foto ${processedCount}/${files.length} processada`);
+                        
+                        // Atualizar display após cada foto
                         displayPhotos(itemIdToUse);
+                        
+                        // Se processou todas as fotos, limpar itemId
+                        if (processedCount === files.length) {
+                            console.log('✅ Todas as fotos foram adicionadas ao relatório');
+                            currentPhotoItemId = null;
+                        }
                     };
+                    
+                    reader.onerror = function() {
+                        console.error('❌ Erro ao ler arquivo:', file.name);
+                        processedCount++;
+                        if (processedCount === files.length) {
+                            currentPhotoItemId = null;
+                        }
+                    };
+                    
                     reader.readAsDataURL(file);
                 });
-                
-                // Limpar itemId apenas após processar todos os arquivos
-                setTimeout(() => {
-                    currentPhotoItemId = null;
-                }, 100);
             };
             
             input.click();
@@ -3461,6 +3496,9 @@
                     return;
                 }
                 
+                // Salvar foto na galeria do dispositivo
+                savePhotoToDeviceGallery(canvas);
+                
                 // Mostrar preview
                 const cameraContainer = document.getElementById('cameraContainer');
                 const cameraPreview = document.getElementById('cameraPreview');
@@ -3477,6 +3515,86 @@
                 alert('⚠️ Erro ao capturar foto: ' + error.message);
                 capturedPhotoData = null;
             }
+        }
+
+        // Salvar foto na galeria do dispositivo
+        async function savePhotoToDeviceGallery(canvas) {
+            try {
+                // Converter canvas para blob
+                canvas.toBlob(async function(blob) {
+                    try {
+                        // Tentar usar a File System Access API (Chrome/Edge)
+                        if ('showSaveFilePicker' in window) {
+                            const fileHandle = await window.showSaveFilePicker({
+                                suggestedName: `inspecao_${Date.now()}.jpg`,
+                                types: [{
+                                    description: 'Imagens JPEG',
+                                    accept: { 'image/jpeg': ['.jpg'] }
+                                }]
+                            });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            console.log('✅ Foto salva na galeria via File System Access API');
+                        } 
+                        // Fallback: criar link de download
+                        else {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `inspecao_${Date.now()}.jpg`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            console.log('✅ Foto salva via download (será salva na pasta Downloads)');
+                        }
+                    } catch (saveError) {
+                        console.warn('⚠️ Não foi possível salvar automaticamente na galeria:', saveError);
+                        // Não mostrar erro ao usuário, a foto ainda pode ser usada
+                    }
+                }, 'image/jpeg', 0.9);
+            } catch (error) {
+                console.warn('⚠️ Erro ao preparar foto para salvar:', error);
+            }
+        }
+
+        // Salvar foto na galeria e abrir seletor de galeria
+        function saveToGalleryAndOpen() {
+            if (!capturedPhotoData) {
+                alert('⚠️ Nenhuma foto capturada.');
+                return;
+            }
+            
+            // Salvar itemId antes de fechar câmera
+            const itemIdToPreserve = currentPhotoItemId;
+            
+            // Fechar câmera (mas preservar itemId)
+            const cameraModal = document.getElementById('cameraModal');
+            cameraModal.classList.remove('active');
+            
+            // Parar o stream da câmera
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            // Limpar video
+            const video = document.getElementById('cameraVideo');
+            video.srcObject = null;
+            
+            // Resetar preview
+            const cameraPreview = document.getElementById('cameraPreview');
+            cameraPreview.classList.remove('active');
+            capturedPhotoData = null;
+            
+            // Restaurar itemId
+            currentPhotoItemId = itemIdToPreserve;
+            
+            // Aguardar um pouco e abrir galeria
+            setTimeout(() => {
+                openGallery();
+            }, 300);
         }
 
         // Tirar outra foto (voltar para câmera)
