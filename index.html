@@ -3249,21 +3249,125 @@
             cameraPreview.classList.remove('active');
             
             try {
-                // Solicitar acesso à câmera traseira
+                // Primeiro, solicitar permissão básica para poder listar dispositivos
+                // Isso é necessário porque alguns navegadores só mostram labels após permissão
+                try {
+                    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    tempStream.getTracks().forEach(track => track.stop());
+                } catch (permError) {
+                    // Ignorar erro de permissão, vamos tentar mesmo assim
+                }
+                
+                // Agora listar dispositivos para encontrar a câmera traseira
+                let deviceId = null;
+                
+                if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    
+                    console.log('📷 Dispositivos de vídeo encontrados:', videoDevices.length);
+                    
+                    // Procurar câmera traseira pelo label
+                    const backCamera = videoDevices.find(device => {
+                        if (!device.label) return false;
+                        const label = device.label.toLowerCase();
+                        return label.includes('back') || 
+                               label.includes('rear') || 
+                               label.includes('traseira') ||
+                               label.includes('environment') ||
+                               label.includes('facing back');
+                    });
+                    
+                    // Se não encontrou por label, tentar pela última câmera (geralmente é a traseira em dispositivos móveis)
+                    if (!backCamera && videoDevices.length > 1) {
+                        // Em dispositivos móveis, geralmente a última câmera listada é a traseira
+                        deviceId = videoDevices[videoDevices.length - 1].deviceId;
+                        console.log('📷 Usando última câmera disponível (provavelmente traseira)');
+                    } else if (backCamera) {
+                        deviceId = backCamera.deviceId;
+                        console.log('📷 Câmera traseira encontrada:', backCamera.label);
+                    }
+                }
+                
+                // Configurar constraints - forçar câmera traseira
                 const constraints = {
                     video: {
-                        facingMode: 'environment', // Câmera traseira
+                        facingMode: { exact: 'environment' }, // Forçar câmera traseira
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }
                 };
                 
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = cameraStream;
+                // Se encontrou deviceId específico, usar ele (prioridade)
+                if (deviceId) {
+                    constraints.video.deviceId = { exact: deviceId };
+                    // Remover facingMode quando usar deviceId específico para evitar conflito
+                    delete constraints.video.facingMode;
+                }
+                
+                // Tentar acessar a câmera
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = cameraStream;
+                    
+                    // Verificar qual câmera está sendo usada
+                    const track = cameraStream.getVideoTracks()[0];
+                    const settings = track.getSettings();
+                    console.log('📷 Câmera ativa - facingMode:', settings.facingMode || 'indefinido', 'deviceId:', settings.deviceId || 'indefinido');
+                    
+                    // Se ainda estiver usando frontal (user), tentar método alternativo
+                    if (settings.facingMode === 'user') {
+                        console.warn('⚠️ Detectada câmera frontal, tentando forçar traseira...');
+                        track.stop();
+                        
+                        // Tentar com deviceId se disponível
+                        if (deviceId) {
+                            const altConstraints = {
+                                video: {
+                                    deviceId: { exact: deviceId },
+                                    width: { ideal: 1280 },
+                                    height: { ideal: 720 }
+                                }
+                            };
+                            cameraStream = await navigator.mediaDevices.getUserMedia(altConstraints);
+                            video.srcObject = cameraStream;
+                        } else {
+                            // Tentar sem exact
+                            const altConstraints = {
+                                video: {
+                                    facingMode: 'environment',
+                                    width: { ideal: 1280 },
+                                    height: { ideal: 720 }
+                                }
+                            };
+                            cameraStream = await navigator.mediaDevices.getUserMedia(altConstraints);
+                            video.srcObject = cameraStream;
+                        }
+                    }
+                    
+                } catch (exactError) {
+                    console.log('⚠️ Erro com exact, tentando método alternativo...', exactError);
+                    // Se falhar com exact, tentar sem exact mas com deviceId
+                    const fallbackConstraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    };
+                    
+                    if (deviceId) {
+                        fallbackConstraints.video.deviceId = { ideal: deviceId };
+                        delete fallbackConstraints.video.facingMode;
+                    }
+                    
+                    cameraStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                    video.srcObject = cameraStream;
+                }
                 
             } catch (error) {
-                console.error('Erro ao acessar câmera:', error);
-                alert('⚠️ Não foi possível acessar a câmera. Verifique as permissões do navegador.\n\n' + error.message);
+                console.error('❌ Erro ao acessar câmera:', error);
+                alert('⚠️ Não foi possível acessar a câmera traseira. Verifique as permissões do navegador.\n\n' + error.message);
                 closeCamera();
             }
         }
