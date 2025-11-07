@@ -1888,22 +1888,71 @@
         // Configuration - SUBSTITUA AQUI SUAS CREDENCIAIS
         const CLIENT_ID = '756155400991-gle9g8l22p3a8h9at5uu5djijtqat9lu.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDTduz53nKthvO9sR1cvHNmD1DK4IDazlM';
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        // Escopo ampliado para permitir compartilhamento de pastas
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive';
 
         // ⚠️ PASTA COMPARTILHADA CENTRALIZADA ⚠️
-        // Pasta pré-configurada para sincronização automática
-        let SHARED_FOLDER_ID = '19H2cLVp7KeNs5rCxVh0wQqfxACxNoJHj'; // Pasta compartilhada pré-configurada
+        // IMPORTANTE: TODOS os usuários DEVEM usar a MESMA pasta compartilhada
+        // Esta pasta será usada por TODOS os usuários para salvar e carregar inspeções
+        // NÃO criar pastas pessoais - SEMPRE usar esta pasta compartilhada
+        let SHARED_FOLDER_ID = '19H2cLVp7KeNs5rCxVh0wQqfxACxNoJHj'; // Pasta compartilhada PRÉ-CONFIGURADA
         
         // Carregar do localStorage na inicialização
         function loadSharedFolderConfig() {
             const savedFolderId = localStorage.getItem('SHARED_FOLDER_ID');
-            if (savedFolderId) {
+            if (savedFolderId && savedFolderId.trim() !== '') {
                 SHARED_FOLDER_ID = savedFolderId;
-                console.log('📁 Pasta compartilhada configurada:', SHARED_FOLDER_ID);
+                console.log('📁 Pasta compartilhada configurada (localStorage):', SHARED_FOLDER_ID);
                 
                 // Preencher o campo na interface
                 const input = document.getElementById('sharedFolderId');
                 if (input) input.value = SHARED_FOLDER_ID;
+            } else {
+                // Se não houver pasta salva, usar a padrão (SEMPRE a mesma para todos)
+                console.log('📁 Usando pasta compartilhada padrão (TODOS usam esta):', SHARED_FOLDER_ID);
+                // Salvar a padrão no localStorage para garantir consistência
+                localStorage.setItem('SHARED_FOLDER_ID', SHARED_FOLDER_ID);
+            }
+        }
+        
+        // Garantir que sempre usamos a pasta compartilhada (SEM FALLBACK)
+        async function ensureSharedFolderAccess() {
+            if (!SHARED_FOLDER_ID || !accessToken) {
+                const errorMsg = 'Pasta compartilhada não configurada ou não conectado ao Drive';
+                console.error('❌', errorMsg);
+                throw new Error(errorMsg);
+            }
+            
+            try {
+                // Verificar se temos acesso à pasta compartilhada
+                const response = await gapi.client.drive.files.get({
+                    fileId: SHARED_FOLDER_ID,
+                    fields: 'id, name, capabilities'
+                });
+                
+                // Verificar se temos permissão de escrita
+                if (response.result.capabilities && !response.result.capabilities.canEdit) {
+                    const errorMsg = 'Você não tem permissão de edição na pasta compartilhada. Configure a pasta nas Configurações → Google Drive → Pasta Centralizada.';
+                    console.error('❌', errorMsg);
+                    throw new Error(errorMsg);
+                }
+                
+                console.log('✅ Acesso à pasta compartilhada confirmado:', response.result.name);
+                return true;
+            } catch (error) {
+                console.error('❌ Erro ao verificar acesso à pasta compartilhada:', error);
+                
+                let errorMsg = 'Erro ao acessar pasta compartilhada';
+                
+                if (error.status === 404) {
+                    errorMsg = `Pasta compartilhada não encontrada (ID: ${SHARED_FOLDER_ID}).\n\nConfigure a pasta correta em Configurações → Google Drive → Pasta Centralizada.`;
+                } else if (error.status === 403) {
+                    errorMsg = 'Acesso negado à pasta compartilhada.\n\nCertifique-se de que a pasta está compartilhada como "Qualquer pessoa com o link pode editar".\n\nConfigure em Configurações → Google Drive → Pasta Centralizada.';
+                } else if (error.message) {
+                    errorMsg = error.message;
+                }
+                
+                throw new Error(errorMsg);
             }
         }
 
@@ -1984,6 +2033,19 @@
                         // Agora solicitar autorização do Google
                         console.log('✅ APIs inicializadas. Solicitando autorização...');
                         requestAccessToken();
+                        
+                        // Após autorização, verificar acesso à pasta compartilhada
+                        setTimeout(async () => {
+                            if (accessToken) {
+                                try {
+                                    await ensureSharedFolderAccess();
+                                    console.log('✅ Acesso à pasta compartilhada confirmado');
+                                } catch (error) {
+                                    console.warn('⚠️ Aviso:', error.message);
+                                    console.warn('⚠️ Configure a pasta compartilhada em Configurações → Google Drive → Pasta Centralizada');
+                                }
+                            }
+                        }, 3000);
                     }
                 }, 100);
                 
@@ -2321,31 +2383,16 @@
             inspections = [];
             
             try {
-                // Determinar pasta raiz
-                let rootFolderId;
-                
-                if (SHARED_FOLDER_ID) {
-                    // Usar pasta compartilhada centralizada
-                    console.log('📁 Usando pasta compartilhada centralizada:', SHARED_FOLDER_ID);
-                    rootFolderId = SHARED_FOLDER_ID;
-                } else {
-                    // Buscar pasta no Drive de quem fez login
-                    console.log('📁 Buscando pasta no Drive pessoal do usuário');
-                    const rootFolderName = 'Inspecoes_Residenciais';
-                    const rootQuery = `mimeType='application/vnd.google-apps.folder' and name='${rootFolderName}' and trashed=false`;
-                    const rootResponse = await gapi.client.drive.files.list({
-                        q: rootQuery,
-                        fields: 'files(id, name)',
-                        spaces: 'drive'
-                    });
-
-                    if (!rootResponse.result.files || rootResponse.result.files.length === 0) {
-                        console.log('📭 Nenhuma pasta de inspeções encontrada no Drive');
-                        return;
-                    }
-
-                    rootFolderId = rootResponse.result.files[0].id;
+                // SEMPRE usar pasta compartilhada - TODOS os usuários usam a MESMA pasta
+                if (!SHARED_FOLDER_ID) {
+                    throw new Error('Pasta compartilhada não configurada. Configure em Configurações → Google Drive → Pasta Centralizada.');
                 }
+                
+                // Garantir acesso à pasta compartilhada (SEM FALLBACK)
+                await ensureSharedFolderAccess();
+                
+                const rootFolderId = SHARED_FOLDER_ID;
+                console.log('📁 Usando pasta compartilhada (TODOS usam esta):', rootFolderId);
                 
                 console.log('📁 Pasta raiz encontrada:', rootFolderId);
 
@@ -4347,19 +4394,16 @@
                 throw new Error('Não conectado ao Google Drive');
             }
 
-            // Determinar pasta raiz
-            let rootFolderId;
-            
-            if (SHARED_FOLDER_ID) {
-                // Usar pasta compartilhada centralizada
-                console.log('📁 Usando pasta compartilhada centralizada:', SHARED_FOLDER_ID);
-                rootFolderId = SHARED_FOLDER_ID;
-            } else {
-                // Criar pasta no Drive de quem fez login
-                console.log('📁 Criando pasta no Drive pessoal do usuário');
-                const rootFolderName = 'Inspecoes_Residenciais';
-                rootFolderId = await findOrCreateFolder(rootFolderName, null);
+            // SEMPRE usar pasta compartilhada - TODOS os usuários usam a MESMA pasta
+            if (!SHARED_FOLDER_ID) {
+                throw new Error('Pasta compartilhada não configurada. Configure em Configurações → Google Drive → Pasta Centralizada.');
             }
+            
+            // Garantir acesso à pasta compartilhada (SEM FALLBACK - não criar pastas pessoais)
+            await ensureSharedFolderAccess();
+            
+            const rootFolderId = SHARED_FOLDER_ID;
+            console.log('📁 Usando pasta compartilhada (TODOS usam esta):', rootFolderId);
 
             // Create folder structure: tipo_inspecao/data/endereco
             const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
@@ -6025,6 +6069,13 @@ Ao continuar usando, você aceita estes termos.
                             // Verificar se já tem accessToken válido
                             if (accessToken) {
                                 console.log('✅ Token existente encontrado, conectando ao Drive...');
+                                // Verificar acesso à pasta compartilhada
+                                ensureSharedFolderAccess().then(() => {
+                                    console.log('✅ Acesso à pasta compartilhada confirmado');
+                                }).catch(error => {
+                                    console.warn('⚠️ Aviso:', error.message);
+                                    console.warn('⚠️ Configure a pasta compartilhada em Configurações → Google Drive → Pasta Centralizada');
+                                });
                                 showMainMenu();
                             } else {
                                 console.log('🔐 Solicitando autorização do Google...');
