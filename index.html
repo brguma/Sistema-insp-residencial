@@ -2461,7 +2461,10 @@
 
         // Deletar inspeção do Google Drive
         async function deleteInspectionFromDrive(inspection) {
-            // Se a inspeção tem driveFolderId, deletar do Drive
+            let driveDeleteSuccess = false;
+            let driveDeleteError = null;
+            
+            // Se a inspeção tem driveFolderId, tentar deletar do Drive
             if (inspection.driveFolderId && accessToken) {
                 try {
                     // Deletar a pasta inteira (que contém o JSON, relatório e fotos)
@@ -2470,13 +2473,21 @@
                     });
 
                     console.log('✅ Pasta deletada do Drive:', inspection.driveFolderId);
+                    driveDeleteSuccess = true;
                 } catch (error) {
                     console.error('❌ Erro ao deletar do Drive:', error);
-                    // Continuar mesmo se falhar no Drive, para remover localmente
+                    driveDeleteError = error;
+                    
+                    // Tratar diferentes tipos de erro
                     if (error.status === 404) {
                         console.warn('⚠️ Pasta não encontrada no Drive (pode já ter sido deletada)');
+                        // Não é um erro crítico, pode continuar
+                    } else if (error.status === 403) {
+                        console.warn('⚠️ Sem permissão para deletar no Drive (inspeção criada por outro usuário)');
+                        // Não é um erro crítico, pode continuar deletando localmente
                     } else {
-                        throw new Error('Erro ao deletar do Google Drive: ' + error.message);
+                        console.warn('⚠️ Erro ao deletar do Drive, mas continuando com exclusão local');
+                        // Não é um erro crítico, pode continuar
                     }
                 }
             } else if (!accessToken) {
@@ -2485,7 +2496,7 @@
                 console.log('ℹ️ Inspeção não tem driveFolderId, deletando apenas localmente');
             }
             
-            // SEMPRE remover do array local, independente de ter driveFolderId
+            // SEMPRE remover do array local, independente de ter driveFolderId ou permissão no Drive
             const index = inspections.findIndex(i => i.id === inspection.id);
             if (index > -1) {
                 inspections.splice(index, 1);
@@ -2493,6 +2504,11 @@
                 console.log('✅ Inspeção removida localmente');
             } else {
                 console.warn('⚠️ Inspeção não encontrada no array local');
+            }
+            
+            // Se houve erro de permissão (403), informar mas não falhar
+            if (driveDeleteError && driveDeleteError.status === 403) {
+                console.log('ℹ️ Inspeção deletada localmente. Não foi possível deletar no Drive (sem permissão).');
             }
         }
 
@@ -5340,12 +5356,18 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
             
             if (confirmation === 'DELETAR') {
                 try {
-                    showProgress('Deletando inspeção do Google Drive...');
+                    showProgress('Deletando inspeção...');
                     await deleteInspectionFromDrive(inspection);
                     hideProgress();
                     
-                    alert('✅ Inspeção deletada com sucesso!');
-                    playSound('success');
+                    // Verificar se a inspeção foi realmente removida
+                    const stillExists = inspections.find(i => i.id === inspection.id);
+                    if (stillExists) {
+                        alert('⚠️ Inspeção removida localmente, mas pode ainda existir no Google Drive.\n\nSe você não tem permissão para deletar no Drive, a inspeção permanecerá lá, mas não aparecerá mais na sua lista local.');
+                    } else {
+                        alert('✅ Inspeção deletada com sucesso!');
+                        playSound('success');
+                    }
                     
                     // Recarregar a lista
                     await loadInspections();
@@ -5354,7 +5376,17 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
                 } catch (error) {
                     hideProgress();
                     console.error('❌ Erro ao deletar:', error);
-                    alert('❌ Erro ao deletar inspeção: ' + error.message);
+                    // Mesmo com erro, tentar remover localmente
+                    const index = inspections.findIndex(i => i.id === inspection.id);
+                    if (index > -1) {
+                        inspections.splice(index, 1);
+                        localStorage.setItem('inspections', JSON.stringify(inspections));
+                        alert('⚠️ Erro ao deletar do Google Drive, mas a inspeção foi removida localmente.\n\n' + error.message);
+                        await loadInspections();
+                        loadDatabaseView();
+                    } else {
+                        alert('❌ Erro ao deletar inspeção: ' + error.message);
+                    }
                 }
             } else if (confirmation !== null) {
                 alert('❌ Texto de confirmação incorreto. A inspeção NÃO foi deletada.');
