@@ -1413,6 +1413,46 @@
                         <input type="text" id="filterAddress" placeholder="Digite o endereço..." oninput="applyFilters()">
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Quartos (mínimo)</label>
+                        <input type="number" id="filterQuartos" placeholder="Mínimo" min="0" onchange="applyFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label>Área Total (m²) - Mínimo</label>
+                        <input type="number" id="filterAreaMin" placeholder="Mínimo m²" min="0" step="0.01" onchange="applyFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label>Área Total (m²) - Máximo</label>
+                        <input type="number" id="filterAreaMax" placeholder="Máximo m²" min="0" step="0.01" onchange="applyFilters()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Pavimentos (mínimo)</label>
+                        <input type="number" id="filterPavimentos" placeholder="Mínimo" min="1" onchange="applyFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label>Suítes (mínimo)</label>
+                        <input type="number" id="filterSuites" placeholder="Mínimo" min="0" onchange="applyFilters()">
+                    </div>
+                    <div class="form-group">
+                        <label>Tem Garagem?</label>
+                        <select id="filterGaragem" onchange="applyFilters()">
+                            <option value="all">Todas</option>
+                            <option value="sim">Sim</option>
+                            <option value="nao">Não</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tem Quintal?</label>
+                        <select id="filterQuintal" onchange="applyFilters()">
+                            <option value="all">Todas</option>
+                            <option value="sim">Sim</option>
+                            <option value="nao">Não</option>
+                        </select>
+                    </div>
+                </div>
                 <div style="margin-top: 10px;">
                     <button class="btn btn-secondary" onclick="clearFilters()">🔄 Limpar Filtros</button>
                 </div>
@@ -2808,6 +2848,10 @@
                         </div>
                     </div>
                     <div class="form-row">
+                        <div class="form-group">
+                            <label>Área Total (m²)</label>
+                            <input type="number" id="areaTotal" value="${baseInspection?.areaTotal || ''}" min="0" step="0.01" placeholder="Ex: 150.50">
+                        </div>
                         <div class="form-group">
                             <label>Possui Quintal?</label>
                             <select id="possuiQuintal">
@@ -4340,6 +4384,7 @@
                 acompanhante: document.getElementById('acompanhante').value,
                 telefoneAcompanhante: document.getElementById('telefoneAcompanhante')?.value || '',
                 idadeImovel: document.getElementById('idadeImovel').value,
+                areaTotal: document.getElementById('areaTotal')?.value || '',
                 qtdPavimentos: document.getElementById('qtdPavimentos').value,
                 qtdSalas: document.getElementById('qtdSalas').value,
                 qtdQuartos: document.getElementById('qtdQuartos').value,
@@ -4850,6 +4895,11 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                                 👤 ${inspection.acompanhante}
                             </div>
                         </div>
+                        <div style="display: flex; gap: 15px; padding-top: 8px; font-size: 12px; color: #888; flex-wrap: wrap;">
+                            ${inspection.idadeImovel ? `<span>🏠 ${inspection.idadeImovel} anos</span>` : ''}
+                            ${inspection.qtdQuartos ? `<span>🛏️ ${inspection.qtdQuartos} quarto${inspection.qtdQuartos !== '1' ? 's' : ''}</span>` : ''}
+                            ${inspection.areaTotal ? `<span>📐 ${inspection.areaTotal} m²</span>` : ''}
+                        </div>
                     </div>
                 `;
             });
@@ -4883,6 +4933,13 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             const typeFilter = document.getElementById('filterType').value;
             const cityFilter = document.getElementById('filterCity').value;
             const addressFilter = document.getElementById('filterAddress').value.toLowerCase();
+            const quartosFilter = document.getElementById('filterQuartos').value;
+            const areaMinFilter = document.getElementById('filterAreaMin').value;
+            const areaMaxFilter = document.getElementById('filterAreaMax').value;
+            const pavimentosFilter = document.getElementById('filterPavimentos').value;
+            const suitesFilter = document.getElementById('filterSuites').value;
+            const garagemFilter = document.getElementById('filterGaragem').value;
+            const quintalFilter = document.getElementById('filterQuintal').value;
             
             let filtered = inspections;
             
@@ -4904,6 +4961,59 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 );
             }
             
+            // Filtro por quartos (mínimo)
+            if (quartosFilter) {
+                const minQuartos = parseInt(quartosFilter);
+                filtered = filtered.filter(i => {
+                    const quartos = parseInt(i.qtdQuartos) || 0;
+                    return quartos >= minQuartos;
+                });
+            }
+            
+            // Filtro por área total (mínimo e máximo)
+            if (areaMinFilter) {
+                const minArea = parseFloat(areaMinFilter);
+                filtered = filtered.filter(i => {
+                    const area = parseFloat(i.areaTotal) || 0;
+                    return area >= minArea;
+                });
+            }
+            if (areaMaxFilter) {
+                const maxArea = parseFloat(areaMaxFilter);
+                filtered = filtered.filter(i => {
+                    const area = parseFloat(i.areaTotal) || 0;
+                    return area <= maxArea;
+                });
+            }
+            
+            // Filtro por pavimentos (mínimo)
+            if (pavimentosFilter) {
+                const minPavimentos = parseInt(pavimentosFilter);
+                filtered = filtered.filter(i => {
+                    const pavimentos = parseInt(i.qtdPavimentos) || 0;
+                    return pavimentos >= minPavimentos;
+                });
+            }
+            
+            // Filtro por suítes (mínimo)
+            if (suitesFilter) {
+                const minSuites = parseInt(suitesFilter);
+                filtered = filtered.filter(i => {
+                    const suites = parseInt(i.qtdSuites) || 0;
+                    return suites >= minSuites;
+                });
+            }
+            
+            // Filtro por garagem
+            if (garagemFilter !== 'all') {
+                filtered = filtered.filter(i => i.possuiGaragem === garagemFilter);
+            }
+            
+            // Filtro por quintal
+            if (quintalFilter !== 'all') {
+                filtered = filtered.filter(i => i.possuiQuintal === quintalFilter);
+            }
+            
             renderInspectionsList(filtered);
         }
 
@@ -4911,6 +5021,13 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             document.getElementById('filterType').value = 'all';
             document.getElementById('filterCity').value = 'all';
             document.getElementById('filterAddress').value = '';
+            document.getElementById('filterQuartos').value = '';
+            document.getElementById('filterAreaMin').value = '';
+            document.getElementById('filterAreaMax').value = '';
+            document.getElementById('filterPavimentos').value = '';
+            document.getElementById('filterSuites').value = '';
+            document.getElementById('filterGaragem').value = 'all';
+            document.getElementById('filterQuintal').value = 'all';
             renderInspectionsList(inspections);
         }
 
