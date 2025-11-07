@@ -3496,10 +3496,7 @@
                     return;
                 }
                 
-                // Salvar foto na galeria do dispositivo
-                savePhotoToDeviceGallery(canvas);
-                
-                // Mostrar preview
+                // Mostrar preview (foto não é salva automaticamente na galeria)
                 const cameraContainer = document.getElementById('cameraContainer');
                 const cameraPreview = document.getElementById('cameraPreview');
                 const capturedPhoto = document.getElementById('capturedPhoto');
@@ -4416,8 +4413,16 @@
             await uploadFile(reportContent, 'relatorio.txt', addressFolderId, 'text/plain');
 
             // Save photos if any
-            if (Object.keys(photoData).length > 0) {
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
+            if (Object.keys(window.photoData).length > 0) {
+                console.log('📸 Salvando fotos no Drive. Total de itens com fotos:', Object.keys(window.photoData).length);
                 await savePhotos(inspection, addressFolderId);
+            } else {
+                console.log('📭 Nenhuma foto para salvar no Drive');
             }
         }
 
@@ -4492,37 +4497,61 @@
                 window.photoData = {};
             }
             
+            console.log('📸 Iniciando salvamento de fotos no Drive...');
+            console.log('📸 Dados de fotos:', Object.keys(window.photoData));
+            
             const photosFolderId = await findOrCreateFolder('fotos', parentFolderId);
+            let totalPhotosSaved = 0;
 
             for (const [itemId, photos] of Object.entries(window.photoData)) {
-                if (photos.length > 0) {
+                if (photos && photos.length > 0) {
+                    console.log(`📸 Salvando ${photos.length} foto(s) para item: ${itemId}`);
                     const itemFolderId = await findOrCreateFolder(itemId, photosFolderId);
 
                     for (let i = 0; i < photos.length; i++) {
-                        const photo = photos[i];
-                        const response = await fetch(photo.data);
-                        const blob = await response.blob();
-                        const fileName = `foto_${i + 1}.jpg`;
+                        try {
+                            const photo = photos[i];
+                            if (!photo || !photo.data) {
+                                console.warn(`⚠️ Foto ${i + 1} do item ${itemId} está vazia, pulando...`);
+                                continue;
+                            }
+                            
+                            const response = await fetch(photo.data);
+                            const blob = await response.blob();
+                            const fileName = `foto_${i + 1}.jpg`;
 
-                        const metadata = {
-                            name: fileName,
-                            parents: [itemFolderId]
-                        };
+                            const metadata = {
+                                name: fileName,
+                                parents: [itemFolderId]
+                            };
 
-                        const formData = new FormData();
-                        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                        formData.append('file', blob);
+                            const formData = new FormData();
+                            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                            formData.append('file', blob);
 
-                        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`
-                            },
-                            body: formData
-                        });
+                            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`
+                                },
+                                body: formData
+                            });
+
+                            if (uploadResponse.ok) {
+                                totalPhotosSaved++;
+                                console.log(`✅ Foto ${i + 1} do item ${itemId} salva com sucesso`);
+                            } else {
+                                const errorData = await uploadResponse.text();
+                                console.error(`❌ Erro ao salvar foto ${i + 1} do item ${itemId}:`, errorData);
+                            }
+                        } catch (error) {
+                            console.error(`❌ Erro ao processar foto ${i + 1} do item ${itemId}:`, error);
+                        }
                     }
                 }
             }
+            
+            console.log(`✅ Salvamento de fotos concluído. Total: ${totalPhotosSaved} foto(s) salva(s)`);
         }
 
         // Create inspection report
