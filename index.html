@@ -3202,11 +3202,6 @@
         let currentPhotoItemId = null;
         let cameraStream = null;
         let capturedPhotoData = null;
-        
-        // Garantir que photoData existe globalmente
-        if (typeof window.photoData === 'undefined') {
-            window.photoData = {};
-        }
 
         // Add photo - Mostra modal de escolha
         function addPhoto(itemId) {
@@ -3247,13 +3242,8 @@
             const input = document.getElementById('galleryInput');
             input.value = ''; // Reset do input
             
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
-            if (!window.photoData[itemIdToUse]) {
-                window.photoData[itemIdToUse] = [];
+            if (!photoData[itemIdToUse]) {
+                photoData[itemIdToUse] = [];
             }
             
             input.onchange = function(e) {
@@ -3272,7 +3262,7 @@
                 files.forEach((file, index) => {
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        window.photoData[itemIdToUse].push({
+                        photoData[itemIdToUse].push({
                             data: event.target.result,
                             name: file.name
                         });
@@ -3632,14 +3622,6 @@
                 console.log('📸 Adicionando foto para itemId:', itemIdToUse);
                 console.log('📸 Tamanho da foto:', photoDataToAdd.length, 'bytes');
                 
-                // Garantir que photoData existe (já deve estar declarada, mas garantir)
-                if (typeof window.photoData === 'undefined') {
-                    window.photoData = {};
-                }
-                
-                // Usar window.photoData para garantir escopo global
-                const photoData = window.photoData;
-                
                 // Adicionar foto aos dados
                 if (!photoData[itemIdToUse]) {
                     photoData[itemIdToUse] = [];
@@ -3693,12 +3675,7 @@
                 return;
             }
             
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
-            const photos = window.photoData[itemId] || [];
+            const photos = photoData[itemId] || [];
             
             // Sempre limpar o container primeiro
             container.innerHTML = '';
@@ -3723,19 +3700,14 @@
 
         // Remove photo
         function removePhoto(itemId, index) {
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
-            if (window.photoData[itemId] && window.photoData[itemId][index] !== undefined) {
+            if (photoData[itemId] && photoData[itemId][index] !== undefined) {
                 // Remover a foto do array
-                window.photoData[itemId].splice(index, 1);
+                photoData[itemId].splice(index, 1);
                 
                 // Se não sobrou nenhuma foto, limpar o array (mas manter a chave)
-                if (window.photoData[itemId].length === 0) {
+                if (photoData[itemId].length === 0) {
                     // Manter a chave mas com array vazio para permitir adicionar novas fotos
-                    window.photoData[itemId] = [];
+                    photoData[itemId] = [];
                 }
                 
                 // Atualizar display (mesmo que esteja vazio, para limpar a interface)
@@ -4283,11 +4255,6 @@
 
         // Collect form data
         function collectFormData() {
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
             const inspection = {
                 id: Date.now().toString(),
                 type: currentInspectionType,
@@ -4312,7 +4279,7 @@
                 possuiQuintal: document.getElementById('possuiQuintal').value,
                 possuiGaragem: document.getElementById('possuiGaragem').value,
                 checklist: collectChecklistData(),
-                photos: window.photoData
+                photos: photoData
             };
 
             // Add complete inspection fields if applicable
@@ -4413,16 +4380,8 @@
             await uploadFile(reportContent, 'relatorio.txt', addressFolderId, 'text/plain');
 
             // Save photos if any
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
-            if (Object.keys(window.photoData).length > 0) {
-                console.log('📸 Salvando fotos no Drive. Total de itens com fotos:', Object.keys(window.photoData).length);
+            if (Object.keys(photoData).length > 0) {
                 await savePhotos(inspection, addressFolderId);
-            } else {
-                console.log('📭 Nenhuma foto para salvar no Drive');
             }
         }
 
@@ -4492,66 +4451,37 @@
 
         // Save photos
         async function savePhotos(inspection, parentFolderId) {
-            // Garantir que photoData existe
-            if (typeof window.photoData === 'undefined') {
-                window.photoData = {};
-            }
-            
-            console.log('📸 Iniciando salvamento de fotos no Drive...');
-            console.log('📸 Dados de fotos:', Object.keys(window.photoData));
-            
             const photosFolderId = await findOrCreateFolder('fotos', parentFolderId);
-            let totalPhotosSaved = 0;
 
-            for (const [itemId, photos] of Object.entries(window.photoData)) {
-                if (photos && photos.length > 0) {
-                    console.log(`📸 Salvando ${photos.length} foto(s) para item: ${itemId}`);
+            for (const [itemId, photos] of Object.entries(photoData)) {
+                if (photos.length > 0) {
                     const itemFolderId = await findOrCreateFolder(itemId, photosFolderId);
 
                     for (let i = 0; i < photos.length; i++) {
-                        try {
-                            const photo = photos[i];
-                            if (!photo || !photo.data) {
-                                console.warn(`⚠️ Foto ${i + 1} do item ${itemId} está vazia, pulando...`);
-                                continue;
-                            }
-                            
-                            const response = await fetch(photo.data);
-                            const blob = await response.blob();
-                            const fileName = `foto_${i + 1}.jpg`;
+                        const photo = photos[i];
+                        const response = await fetch(photo.data);
+                        const blob = await response.blob();
+                        const fileName = `foto_${i + 1}.jpg`;
 
-                            const metadata = {
-                                name: fileName,
-                                parents: [itemFolderId]
-                            };
+                        const metadata = {
+                            name: fileName,
+                            parents: [itemFolderId]
+                        };
 
-                            const formData = new FormData();
-                            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                            formData.append('file', blob);
+                        const formData = new FormData();
+                        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                        formData.append('file', blob);
 
-                            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${accessToken}`
-                                },
-                                body: formData
-                            });
-
-                            if (uploadResponse.ok) {
-                                totalPhotosSaved++;
-                                console.log(`✅ Foto ${i + 1} do item ${itemId} salva com sucesso`);
-                            } else {
-                                const errorData = await uploadResponse.text();
-                                console.error(`❌ Erro ao salvar foto ${i + 1} do item ${itemId}:`, errorData);
-                            }
-                        } catch (error) {
-                            console.error(`❌ Erro ao processar foto ${i + 1} do item ${itemId}:`, error);
-                        }
+                        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`
+                            },
+                            body: formData
+                        });
                     }
                 }
             }
-            
-            console.log(`✅ Salvamento de fotos concluído. Total: ${totalPhotosSaved} foto(s) salva(s)`);
         }
 
         // Create inspection report
