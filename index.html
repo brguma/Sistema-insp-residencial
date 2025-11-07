@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Inspeção Residencial - v3.3 (Drive Pré-Configurado)</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Inspeção">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+    <link rel="mask-icon" href="icon.svg" color="#667eea">
     <!-- Google Drive API Scripts -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -3179,10 +3195,15 @@
             }
         }
 
-        // Variáveis globais para câmera
+        // Variáveis globais para câmera e fotos
         let currentPhotoItemId = null;
         let cameraStream = null;
         let capturedPhotoData = null;
+        
+        // Garantir que photoData existe globalmente
+        if (typeof window.photoData === 'undefined') {
+            window.photoData = {};
+        }
 
         // Add photo - Mostra modal de escolha
         function addPhoto(itemId) {
@@ -3212,14 +3233,19 @@
             input.onchange = function(e) {
                 const files = Array.from(e.target.files);
                 
-                if (!photoData[currentPhotoItemId]) {
-                    photoData[currentPhotoItemId] = [];
+                // Garantir que photoData existe
+                if (typeof window.photoData === 'undefined') {
+                    window.photoData = {};
+                }
+                
+                if (!window.photoData[currentPhotoItemId]) {
+                    window.photoData[currentPhotoItemId] = [];
                 }
                 
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        photoData[currentPhotoItemId].push({
+                        window.photoData[currentPhotoItemId].push({
                             data: event.target.result,
                             name: file.name
                         });
@@ -3396,28 +3422,51 @@
 
         // Capturar foto
         function capturePhoto() {
-            const video = document.getElementById('cameraVideo');
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Definir tamanho do canvas igual ao vídeo
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            // Desenhar frame do vídeo no canvas (câmera traseira - imagem normal)
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Converter para base64
-            capturedPhotoData = canvas.toDataURL('image/jpeg', 0.9);
-            
-            // Mostrar preview
-            const cameraContainer = document.getElementById('cameraContainer');
-            const cameraPreview = document.getElementById('cameraPreview');
-            const capturedPhoto = document.getElementById('capturedPhoto');
-            
-            capturedPhoto.src = capturedPhotoData;
-            cameraContainer.style.display = 'none';
-            cameraPreview.classList.add('active');
+            try {
+                const video = document.getElementById('cameraVideo');
+                
+                // Verificar se o vídeo está pronto
+                if (!video || !video.videoWidth || !video.videoHeight) {
+                    alert('⚠️ Aguarde a câmera carregar completamente antes de tirar a foto.');
+                    return;
+                }
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Definir tamanho do canvas igual ao vídeo
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Desenhar frame do vídeo no canvas (câmera traseira - imagem normal)
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Converter para base64
+                capturedPhotoData = canvas.toDataURL('image/jpeg', 0.9);
+                
+                // Validar se a foto foi capturada
+                if (!capturedPhotoData || capturedPhotoData.length < 100) {
+                    alert('⚠️ Erro ao capturar foto. Tente novamente.');
+                    capturedPhotoData = null;
+                    return;
+                }
+                
+                // Mostrar preview
+                const cameraContainer = document.getElementById('cameraContainer');
+                const cameraPreview = document.getElementById('cameraPreview');
+                const capturedPhoto = document.getElementById('capturedPhoto');
+                
+                capturedPhoto.src = capturedPhotoData;
+                cameraContainer.style.display = 'none';
+                cameraPreview.classList.add('active');
+                
+                console.log('✅ Foto capturada com sucesso. Tamanho:', capturedPhotoData.length, 'bytes');
+                
+            } catch (error) {
+                console.error('❌ Erro ao capturar foto:', error);
+                alert('⚠️ Erro ao capturar foto: ' + error.message);
+                capturedPhotoData = null;
+            }
         }
 
         // Tirar outra foto (voltar para câmera)
@@ -3427,34 +3476,68 @@
             
             cameraPreview.classList.remove('active');
             cameraContainer.style.display = 'block';
-            capturedPhotoData = null;
+            capturedPhotoData = null; // Limpar foto anterior, mas manter currentPhotoItemId
+            console.log('📷 Voltando para câmera. ItemId mantido:', currentPhotoItemId);
         }
 
         // Usar foto capturada
         function useCapturedPhoto() {
-            if (!capturedPhotoData || !currentPhotoItemId) {
-                alert('⚠️ Erro ao processar foto.');
-                return;
+            try {
+                // Validar dados
+                if (!capturedPhotoData) {
+                    alert('⚠️ Nenhuma foto capturada. Por favor, tire uma foto primeiro.');
+                    return;
+                }
+                
+                if (!currentPhotoItemId) {
+                    alert('⚠️ Erro: contexto da foto não encontrado. Tente adicionar a foto novamente.');
+                    closeCamera();
+                    return;
+                }
+                
+                // Salvar itemId e foto antes de fechar a câmera
+                const itemIdToUse = currentPhotoItemId;
+                const photoDataToAdd = capturedPhotoData;
+                
+                console.log('📸 Adicionando foto para itemId:', itemIdToUse);
+                console.log('📸 Tamanho da foto:', photoDataToAdd.length, 'bytes');
+                
+                // Garantir que photoData existe (já deve estar declarada, mas garantir)
+                if (typeof window.photoData === 'undefined') {
+                    window.photoData = {};
+                }
+                
+                // Usar window.photoData para garantir escopo global
+                const photoData = window.photoData;
+                
+                // Adicionar foto aos dados
+                if (!photoData[itemIdToUse]) {
+                    photoData[itemIdToUse] = [];
+                }
+                
+                // Adicionar foto
+                photoData[itemIdToUse].push({
+                    data: photoDataToAdd,
+                    name: `foto_${Date.now()}.jpg`
+                });
+                
+                console.log('✅ Foto adicionada aos dados. Total de fotos para este item:', photoData[itemIdToUse].length);
+                
+                // Fechar câmera (isso limpa as variáveis globais)
+                closeCamera();
+                
+                // Atualizar display após fechar câmera
+                setTimeout(() => {
+                    displayPhotos(itemIdToUse);
+                    // Feedback
+                    playSound('success');
+                }, 100);
+                
+            } catch (error) {
+                console.error('❌ Erro ao processar foto:', error);
+                alert('⚠️ Erro ao processar foto: ' + error.message);
+                closeCamera();
             }
-            
-            // Adicionar foto aos dados
-            if (!photoData[currentPhotoItemId]) {
-                photoData[currentPhotoItemId] = [];
-            }
-            
-            photoData[currentPhotoItemId].push({
-                data: capturedPhotoData,
-                name: `foto_${Date.now()}.jpg`
-            });
-            
-            // Atualizar display
-            displayPhotos(currentPhotoItemId);
-            
-            // Fechar câmera
-            closeCamera();
-            
-            // Feedback
-            playSound('success');
         }
 
         // Fechar modais ao clicar fora
@@ -3480,7 +3563,12 @@
                 return;
             }
             
-            const photos = photoData[itemId] || [];
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
+            const photos = window.photoData[itemId] || [];
             
             if (photos.length === 0) {
                 console.log(`📭 Nenhuma foto para ${itemId}`);
@@ -3504,8 +3592,15 @@
 
         // Remove photo
         function removePhoto(itemId, index) {
-            photoData[itemId].splice(index, 1);
-            displayPhotos(itemId);
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
+            if (window.photoData[itemId] && window.photoData[itemId][index]) {
+                window.photoData[itemId].splice(index, 1);
+                displayPhotos(itemId);
+            }
         }
 
         // Download PDF Report
@@ -4048,6 +4143,11 @@
 
         // Collect form data
         function collectFormData() {
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
             const inspection = {
                 id: Date.now().toString(),
                 type: currentInspectionType,
@@ -4072,7 +4172,7 @@
                 possuiQuintal: document.getElementById('possuiQuintal').value,
                 possuiGaragem: document.getElementById('possuiGaragem').value,
                 checklist: collectChecklistData(),
-                photos: photoData
+                photos: window.photoData
             };
 
             // Add complete inspection fields if applicable
@@ -4244,9 +4344,14 @@
 
         // Save photos
         async function savePhotos(inspection, parentFolderId) {
+            // Garantir que photoData existe
+            if (typeof window.photoData === 'undefined') {
+                window.photoData = {};
+            }
+            
             const photosFolderId = await findOrCreateFolder('fotos', parentFolderId);
 
-            for (const [itemId, photos] of Object.entries(photoData)) {
+            for (const [itemId, photos] of Object.entries(window.photoData)) {
                 if (photos.length > 0) {
                     const itemFolderId = await findOrCreateFolder(itemId, photosFolderId);
 
