@@ -1033,7 +1033,7 @@
             width: 100%;
             height: auto;
             display: block;
-            transform: scaleX(-1); /* Espelha a imagem para parecer espelho */
+            /* Câmera traseira não precisa espelhar */
         }
 
         .camera-controls {
@@ -3234,7 +3234,7 @@
             input.click();
         }
 
-        // Abrir câmera frontal
+        // Abrir câmera traseira
         async function openCamera() {
             closePhotoChoiceModal();
             
@@ -3249,10 +3249,10 @@
             cameraPreview.classList.remove('active');
             
             try {
-                // Solicitar acesso à câmera frontal
+                // Solicitar acesso à câmera traseira
                 const constraints = {
                     video: {
-                        facingMode: 'user', // Câmera frontal
+                        facingMode: 'environment', // Câmera traseira
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     }
@@ -3300,14 +3300,13 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // Desenhar frame do vídeo no canvas
-            // O vídeo aparece espelhado no CSS, mas salvamos a imagem normal (não espelhada)
+            // Desenhar frame do vídeo no canvas (câmera traseira - imagem normal)
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             // Converter para base64
             capturedPhotoData = canvas.toDataURL('image/jpeg', 0.9);
             
-            // Mostrar preview (o CSS do preview espelha novamente para consistência visual)
+            // Mostrar preview
             const cameraContainer = document.getElementById('cameraContainer');
             const cameraPreview = document.getElementById('cameraPreview');
             const capturedPhoto = document.getElementById('capturedPhoto');
