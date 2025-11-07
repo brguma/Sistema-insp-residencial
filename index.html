@@ -1197,7 +1197,7 @@
             <img id="capturedPhoto" alt="Foto capturada">
             <div class="camera-preview-controls">
                 <button class="camera-preview-btn" onclick="retakePhoto()">🔄 Tirar Outra</button>
-                <button class="camera-preview-btn" onclick="saveToGalleryAndOpen()">💾 Salvar e Abrir Galeria</button>
+                <button class="camera-preview-btn" onclick="cancelPhoto()">✖️ Cancelar</button>
                 <button class="camera-preview-btn use" onclick="useCapturedPhoto()">✅ Usar Esta Foto</button>
             </div>
         </div>
@@ -3608,6 +3608,11 @@
             console.log('📷 Voltando para câmera. ItemId mantido:', currentPhotoItemId);
         }
 
+        // Cancelar foto (fechar câmera sem usar)
+        function cancelPhoto() {
+            closeCamera();
+        }
+
         // Usar foto capturada
         function useCapturedPhoto() {
             try {
@@ -3698,14 +3703,15 @@
             
             const photos = window.photoData[itemId] || [];
             
+            // Sempre limpar o container primeiro
+            container.innerHTML = '';
+            
             if (photos.length === 0) {
                 console.log(`📭 Nenhuma foto para ${itemId}`);
                 return;
             }
             
             console.log(`📸 Renderizando ${photos.length} foto(s) em ${itemId}_photos`);
-            
-            container.innerHTML = '';
             
             photos.forEach((photo, index) => {
                 const photoDiv = document.createElement('div');
@@ -3725,8 +3731,17 @@
                 window.photoData = {};
             }
             
-            if (window.photoData[itemId] && window.photoData[itemId][index]) {
+            if (window.photoData[itemId] && window.photoData[itemId][index] !== undefined) {
+                // Remover a foto do array
                 window.photoData[itemId].splice(index, 1);
+                
+                // Se não sobrou nenhuma foto, limpar o array (mas manter a chave)
+                if (window.photoData[itemId].length === 0) {
+                    // Manter a chave mas com array vazio para permitir adicionar novas fotos
+                    window.photoData[itemId] = [];
+                }
+                
+                // Atualizar display (mesmo que esteja vazio, para limpar a interface)
                 displayPhotos(itemId);
             }
         }
