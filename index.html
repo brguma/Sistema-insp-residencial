@@ -1173,7 +1173,7 @@
                 <button class="photo-choice-btn" onclick="openGallery()">
                     🖼️ Escolher da Galeria
                 </button>
-                <button class="photo-choice-btn cancel" onclick="closePhotoChoiceModal()">
+                <button class="photo-choice-btn cancel" onclick="closePhotoChoiceModal(true)">
                     ✖️ Cancelar
                 </button>
             </div>
@@ -3218,15 +3218,19 @@
         }
 
         // Fechar modal de escolha
-        function closePhotoChoiceModal() {
+        function closePhotoChoiceModal(clearItemId = false) {
             const modal = document.getElementById('photoChoiceModal');
             modal.classList.remove('active');
-            currentPhotoItemId = null;
+            // Só limpar currentPhotoItemId se explicitamente solicitado
+            // (não limpar quando abrindo câmera ou galeria)
+            if (clearItemId) {
+                currentPhotoItemId = null;
+            }
         }
 
         // Abrir galeria (funcionalidade original)
         function openGallery() {
-            closePhotoChoiceModal();
+            closePhotoChoiceModal(false); // Não limpar itemId ainda
             const input = document.getElementById('galleryInput');
             input.value = ''; // Reset do input
             
@@ -3242,19 +3246,25 @@
                     window.photoData[currentPhotoItemId] = [];
                 }
                 
+                // Salvar itemId antes de processar arquivos
+                const itemIdToUse = currentPhotoItemId;
+                
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        window.photoData[currentPhotoItemId].push({
+                        window.photoData[itemIdToUse].push({
                             data: event.target.result,
                             name: file.name
                         });
-                        displayPhotos(currentPhotoItemId);
+                        displayPhotos(itemIdToUse);
                     };
                     reader.readAsDataURL(file);
                 });
                 
-                currentPhotoItemId = null;
+                // Limpar itemId apenas após processar todos os arquivos
+                setTimeout(() => {
+                    currentPhotoItemId = null;
+                }, 100);
             };
             
             input.click();
@@ -3262,7 +3272,7 @@
 
         // Abrir câmera traseira
         async function openCamera() {
-            closePhotoChoiceModal();
+            closePhotoChoiceModal(false); // Não limpar itemId, vamos precisar dele depois
             
             const cameraModal = document.getElementById('cameraModal');
             const video = document.getElementById('cameraVideo');
@@ -3547,7 +3557,7 @@
             
             // Fechar modal de escolha se clicar fora
             if (event.target === photoChoiceModal) {
-                closePhotoChoiceModal();
+                closePhotoChoiceModal(true); // Limpar itemId ao cancelar
             }
             
             // Não fechar modal da câmera ao clicar fora (para evitar perder a foto)
