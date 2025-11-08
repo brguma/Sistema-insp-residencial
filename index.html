@@ -4264,70 +4264,106 @@
                     );
                 }
                 
-                // Criar documento
+                // Criar documento com configurações básicas
                 const doc = new Document({
+                    creator: "Sistema de Inspeção Residencial",
+                    title: `Relatório de Inspeção - ${inspection.type}`,
+                    description: `Relatório de inspeção residencial gerado em ${new Date().toLocaleString('pt-BR')}`,
                     sections: [{
-                        properties: {},
+                        properties: {
+                            page: {
+                                margin: {
+                                    top: 1440,    // 1 polegada = 1440 twips
+                                    right: 1440,
+                                    bottom: 1440,
+                                    left: 1440
+                                }
+                            }
+                        },
                         children: children
                     }]
                 });
                 
-                // Gerar blob
-                const blob = await Packer.toBlob(doc);
+                // Gerar blob com tratamento de erro
+                let blob;
+                try {
+                    blob = await Packer.toBlob(doc);
+                    console.log('✅ Documento DOCX gerado com sucesso, tamanho:', blob.size, 'bytes');
+                    
+                    // Verificar se o blob é válido
+                    if (!blob || blob.size === 0) {
+                        throw new Error('Arquivo DOCX gerado está vazio');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao gerar blob do documento:', error);
+                    throw new Error('Erro ao gerar arquivo DOCX: ' + error.message);
+                }
                 
                 // Nome do arquivo
                 const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.docx`;
                 
-                // Fazer upload para o Drive se conectado
+                // Primeiro, sempre fazer download local para garantir que o arquivo está OK
+                saveAs(blob, nomeArquivo);
+                hideProgress();
+                playSound('success');
+                
+                // Fazer upload para o Drive em background (sem bloquear)
                 if (accessToken) {
-                    try {
-                        showProgress('Enviando relatório para o Google Drive...');
-                        
-                        // Obter ou criar pasta da obra no Drive
-                        let folderId = inspection.driveFolderId;
-                        
-                        if (!folderId) {
-                            // Criar estrutura de pastas se não existir
-                            if (!SHARED_FOLDER_ID) {
-                                throw new Error('Pasta compartilhada não configurada');
-                            }
+                    // Upload em background sem bloquear a interface
+                    (async () => {
+                        try {
+                            showProgress('Enviando relatório para o Google Drive...');
                             
-                            await ensureSharedFolderAccess();
-                            const rootFolderId = SHARED_FOLDER_ID;
+                            // Timeout de 30 segundos para o upload
+                            const uploadPromise = (async () => {
+                                // Obter ou criar pasta da obra no Drive
+                                let folderId = inspection.driveFolderId;
+                                
+                                if (!folderId) {
+                                    // Criar estrutura de pastas se não existir
+                                    if (!SHARED_FOLDER_ID) {
+                                        throw new Error('Pasta compartilhada não configurada');
+                                    }
+                                    
+                                    await ensureSharedFolderAccess();
+                                    const rootFolderId = SHARED_FOLDER_ID;
+                                    
+                                    const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
+                                    const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                                    
+                                    const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
+                                    const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                                    
+                                    const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
+                                    folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                                }
+                                
+                                // Upload direto do blob para o Drive
+                                await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                            })();
                             
-                            const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
-                            const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                            // Adicionar timeout
+                            const timeoutPromise = new Promise((_, reject) => {
+                                setTimeout(() => reject(new Error('Timeout: Upload demorou mais de 30 segundos')), 30000);
+                            });
                             
-                            const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
-                            const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                            await Promise.race([uploadPromise, timeoutPromise]);
                             
-                            const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
-                            folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                            hideProgress();
+                            alert('✅ Relatório DOCX também foi enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
+                            
+                        } catch (error) {
+                            console.error('Erro ao enviar para o Drive:', error);
+                            hideProgress();
+                            // Não mostrar alerta de erro para não incomodar - o arquivo já foi baixado
+                            console.warn('⚠️ Upload para Drive falhou, mas arquivo foi salvo localmente:', error.message);
                         }
-                        
-                        // Upload direto do blob para o Drive
-                        await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-                        
-                        hideProgress();
-                        playSound('success');
-                        alert('✅ Relatório DOCX gerado e enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
-                        
-                        // Também fazer download local
-                        saveAs(blob, nomeArquivo);
-                        
-                    } catch (error) {
-                        console.error('Erro ao enviar para o Drive:', error);
-                        hideProgress();
-                        
-                        // Fazer download local mesmo se falhar o upload
-                        saveAs(blob, nomeArquivo);
-                        alert('✅ Relatório DOCX gerado com sucesso!\n\n⚠️ Erro ao enviar para o Google Drive. O arquivo foi baixado localmente.\n\nErro: ' + error.message);
-                    }
+                    })();
+                    
+                    // Mostrar mensagem de sucesso imediatamente
+                    alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n📤 O upload para o Google Drive está sendo feito em segundo plano.');
                 } else {
                     // Apenas download local se não estiver conectado ao Drive
-                    saveAs(blob, nomeArquivo);
-                    hideProgress();
-                    playSound('success');
                     alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n⚠️ Não conectado ao Google Drive. Para enviar automaticamente, configure o Drive nas Configurações.');
                 }
                 
@@ -6006,55 +6042,67 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 // Nome do arquivo
                 const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.docx`;
                 
-                // Fazer upload para o Drive se conectado
+                // Primeiro, sempre fazer download local para garantir que o arquivo está OK
+                saveAs(blob, nomeArquivo);
+                hideProgress();
+                playSound('success');
+                
+                // Fazer upload para o Drive em background (sem bloquear)
                 if (accessToken) {
-                    try {
-                        showProgress('Enviando relatório para o Google Drive...');
-                        
-                        // Obter ou criar pasta da obra no Drive
-                        let folderId = inspection.driveFolderId;
-                        
-                        if (!folderId) {
-                            if (!SHARED_FOLDER_ID) {
-                                throw new Error('Pasta compartilhada não configurada');
-                            }
+                    // Upload em background sem bloquear a interface
+                    (async () => {
+                        try {
+                            showProgress('Enviando relatório para o Google Drive...');
                             
-                            await ensureSharedFolderAccess();
-                            const rootFolderId = SHARED_FOLDER_ID;
+                            // Timeout de 30 segundos para o upload
+                            const uploadPromise = (async () => {
+                                // Obter ou criar pasta da obra no Drive
+                                let folderId = inspection.driveFolderId;
+                                
+                                if (!folderId) {
+                                    if (!SHARED_FOLDER_ID) {
+                                        throw new Error('Pasta compartilhada não configurada');
+                                    }
+                                    
+                                    await ensureSharedFolderAccess();
+                                    const rootFolderId = SHARED_FOLDER_ID;
+                                    
+                                    const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
+                                    const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                                    
+                                    const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
+                                    const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                                    
+                                    const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
+                                    folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                                }
+                                
+                                // Upload direto do blob
+                                await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                            })();
                             
-                            const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
-                            const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                            // Adicionar timeout
+                            const timeoutPromise = new Promise((_, reject) => {
+                                setTimeout(() => reject(new Error('Timeout: Upload demorou mais de 30 segundos')), 30000);
+                            });
                             
-                            const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
-                            const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                            await Promise.race([uploadPromise, timeoutPromise]);
                             
-                            const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
-                            folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                            hideProgress();
+                            alert('✅ Relatório DOCX também foi enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
+                            
+                        } catch (error) {
+                            console.error('Erro ao enviar para o Drive:', error);
+                            hideProgress();
+                            // Não mostrar alerta de erro para não incomodar - o arquivo já foi baixado
+                            console.warn('⚠️ Upload para Drive falhou, mas arquivo foi salvo localmente:', error.message);
                         }
-                        
-                        // Upload direto do blob
-                        await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-                        
-                        hideProgress();
-                        playSound('success');
-                        alert('✅ Relatório DOCX gerado e enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
-                        
-                        // Também fazer download local
-                        saveAs(blob, nomeArquivo);
-                        
-                    } catch (error) {
-                        console.error('Erro ao enviar para o Drive:', error);
-                        hideProgress();
-                        
-                        // Fazer download local mesmo se falhar o upload
-                        saveAs(blob, nomeArquivo);
-                        alert('✅ Relatório DOCX gerado com sucesso!\n\n⚠️ Erro ao enviar para o Google Drive. O arquivo foi baixado localmente.\n\nErro: ' + error.message);
-                    }
+                    })();
+                    
+                    // Mostrar mensagem de sucesso imediatamente
+                    alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n📤 O upload para o Google Drive está sendo feito em segundo plano.');
                 } else {
                     // Apenas download local se não estiver conectado ao Drive
-                    saveAs(blob, nomeArquivo);
-                    hideProgress();
-                    playSound('success');
                     alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n⚠️ Não conectado ao Google Drive. Para enviar automaticamente, configure o Drive nas Configurações.');
                 }
                 
