@@ -23,8 +23,12 @@
     <!-- Google Drive API Scripts -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- jsPDF para geração de PDFs -->
+    <!-- jsPDF para geração de PDFs (mantido para compatibilidade) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- docx para geração de documentos DOCX -->
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -2967,7 +2971,7 @@
             formHTML += `
                 <div class="form-actions">
                     <button class="btn btn-secondary" onclick="backToMenu()">Cancelar</button>
-                    <button class="btn" onclick="downloadPDFReport()" style="background: #FF5722; color: white;">📄 Baixar Relatório PDF</button>
+                    <button class="btn" onclick="downloadDOCXReport()" style="background: #FF5722; color: white;">📄 Exportar Relatório DOCX</button>
                     <button class="btn btn-success" onclick="saveInspection()">💾 Salvar Inspeção</button>
                 </div>
             `;
@@ -3828,7 +3832,468 @@
             }
         }
 
-        // Download PDF Report
+        // Função auxiliar para converter base64 para Uint8Array
+        async function base64ToUint8Array(base64String) {
+            // Remove o prefixo data:image/...;base64, se houver
+            const base64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        // Função auxiliar para obter dimensões da imagem
+        function getImageDimensions(base64String) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    resolve({
+                        width: this.width,
+                        height: this.height
+                    });
+                };
+                img.onerror = function() {
+                    resolve({ width: 400, height: 300 }); // Dimensões padrão
+                };
+                img.src = base64String;
+            });
+        }
+
+        // Download DOCX Report
+        async function downloadDOCXReport() {
+            // Validar formulário primeiro
+            if (!validateForm()) {
+                alert('⚠️ Por favor, preencha todos os campos obrigatórios antes de gerar o relatório.');
+                return;
+            }
+            
+            // Coletar dados do formulário
+            const inspection = collectFormData();
+            
+            try {
+                showProgress('Gerando relatório DOCX...');
+                
+                // Verificar se a biblioteca docx está disponível
+                if (typeof docx === 'undefined') {
+                    alert('⚠️ Biblioteca docx ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                    hideProgress();
+                    return;
+                }
+
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, WidthType, ImageRun } = docx;
+                
+                // Array para armazenar elementos do documento
+                const children = [];
+                
+                // Título do relatório
+                children.push(
+                    new Paragraph({
+                        text: "RELATÓRIO DE INSPEÇÃO RESIDENCIAL",
+                        heading: HeadingLevel.HEADING_1,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 200 }
+                    })
+                );
+                
+                // Tipo de inspeção
+                const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
+                children.push(
+                    new Paragraph({
+                        text: tipoTexto,
+                        heading: HeadingLevel.HEADING_2,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 300 }
+                    })
+                );
+                
+                // DADOS DO IMÓVEL
+                children.push(
+                    new Paragraph({
+                        text: "DADOS DO IMÓVEL",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { before: 200, after: 200 }
+                    })
+                );
+                
+                const dadosImovel = [
+                    ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
+                    ['Complemento:', inspection.complemento || 'N/A'],
+                    ['Bairro:', inspection.bairro],
+                    ['Município/UF:', `${inspection.municipio} - ${inspection.uf}`],
+                    ['Data da Vistoria:', inspection.dataVistoria],
+                    ['Hora da Vistoria:', inspection.horaVistoria],
+                    ['Acompanhante:', inspection.acompanhante],
+                    ['Idade do Imóvel:', `${inspection.idadeImovel} anos`]
+                ];
+                
+                dadosImovel.forEach(([label, value]) => {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: label, bold: true }),
+                                new TextRun({ text: ` ${value}` })
+                            ],
+                            spacing: { after: 100 }
+                        })
+                    );
+                });
+                
+                // CARACTERÍSTICAS
+                children.push(
+                    new Paragraph({
+                        text: "CARACTERÍSTICAS DO IMÓVEL",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { before: 400, after: 200 }
+                    })
+                );
+                
+                const caracteristicas = [
+                    ['Pavimentos:', inspection.qtdPavimentos || 'N/A'],
+                    ['Salas:', inspection.qtdSalas || 'N/A'],
+                    ['Quartos:', inspection.qtdQuartos || 'N/A'],
+                    ['Suítes:', inspection.qtdSuites || 'N/A'],
+                    ['Cozinhas:', inspection.qtdCozinhas || 'N/A'],
+                    ['Quintal:', inspection.possuiQuintal || 'N/A'],
+                    ['Garagem:', inspection.possuiGaragem || 'N/A']
+                ];
+                
+                caracteristicas.forEach(([label, value]) => {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: label, bold: true }),
+                                new TextRun({ text: ` ${value}` })
+                            ],
+                            spacing: { after: 100 }
+                        })
+                    );
+                });
+                
+                // FOTOS GERAIS DO IMÓVEL
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    children.push(
+                        new Paragraph({
+                            text: "FOTOS GERAIS DO IMÓVEL",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            children.push(
+                                new Paragraph({
+                                    text: fotoGeral.nome.toUpperCase(),
+                                    heading: HeadingLevel.HEADING_3,
+                                    spacing: { before: 200, after: 100 }
+                                })
+                            );
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                try {
+                                    const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
+                                        fotoGeral.fotos[i].data : fotoGeral.fotos[i];
+                                    
+                                    const imageBytes = await base64ToUint8Array(imageData);
+                                    const dimensions = await getImageDimensions(imageData);
+                                    
+                                    // Redimensionar para caber no documento (max width 500px)
+                                    const maxWidth = 500;
+                                    const aspectRatio = dimensions.width / dimensions.height;
+                                    const width = Math.min(dimensions.width, maxWidth);
+                                    const height = width / aspectRatio;
+                                    
+                                    children.push(
+                                        new Paragraph({
+                                            children: [
+                                                new ImageRun({
+                                                    data: imageBytes,
+                                                    transformation: {
+                                                        width: width * 9525, // Converter para EMU (English Metric Units)
+                                                        height: height * 9525
+                                                    }
+                                                })
+                                            ],
+                                            alignment: AlignmentType.LEFT,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                    
+                                    children.push(
+                                        new Paragraph({
+                                            text: `Foto ${i + 1}`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto geral ao DOCX:', error);
+                                    children.push(
+                                        new Paragraph({
+                                            text: `[Erro ao carregar foto ${i + 1}]`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // PROBLEMAS ENCONTRADOS
+                const problemasEncontrados = [];
+                
+                if (inspection.checklist) {
+                    Object.keys(inspection.checklist).forEach(itemId => {
+                        const item = inspection.checklist[itemId];
+                        
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                            const categoryName = getCategoryNameFromId(itemId);
+                            const itemName = getItemNameFromId(itemId);
+                            
+                            if (item.occurrences && item.occurrences.length > 0) {
+                                item.occurrences.forEach((occ, index) => {
+                                    const occNum = occ.occurrenceNum || (index + 1);
+                                    problemasEncontrados.push({
+                                        categoria: categoryName,
+                                        item: itemName,
+                                        ocorrencia: occNum,
+                                        observacao: occ.observation || 'Sem observação',
+                                        photoKey: `${itemId}_${occNum}`
+                                    });
+                                });
+                            } else if (item.observation) {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: item.observation,
+                                    photoKey: `${itemId}_1`
+                                });
+                            } else {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: 'Problema identificado',
+                                    photoKey: `${itemId}_1`
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                if (problemasEncontrados.length > 0) {
+                    children.push(
+                        new Paragraph({
+                            text: "PROBLEMAS ENCONTRADOS",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
+                    
+                    for (let i = 0; i < problemasEncontrados.length; i++) {
+                        const problema = problemasEncontrados[i];
+                        
+                        // Número do problema
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ 
+                                        text: `${i + 1}. ${problema.categoria} - ${problema.item}`, 
+                                        bold: true,
+                                        size: 22
+                                    })
+                                ],
+                                spacing: { before: 200, after: 100 }
+                            })
+                        );
+                        
+                        // Ocorrência (se houver múltiplas)
+                        if (problemasEncontrados.filter(p => p.item === problema.item).length > 1) {
+                            children.push(
+                                new Paragraph({
+                                    text: `(Ocorrência ${problema.ocorrencia})`,
+                                    spacing: { after: 100 }
+                                })
+                            );
+                        }
+                        
+                        // Observação
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: "Observação: ", bold: true }),
+                                    new TextRun({ text: problema.observacao })
+                                ],
+                                spacing: { after: 200 }
+                            })
+                        );
+                        
+                        // Adicionar fotos se existirem
+                        if (inspection.photos && inspection.photos[problema.photoKey]) {
+                            const fotos = inspection.photos[problema.photoKey];
+                            
+                            for (let j = 0; j < fotos.length; j++) {
+                                try {
+                                    const imageData = (typeof fotos[j] === 'object' && fotos[j].data) ? fotos[j].data : fotos[j];
+                                    const imageBytes = await base64ToUint8Array(imageData);
+                                    const dimensions = await getImageDimensions(imageData);
+                                    
+                                    // Redimensionar para caber no documento
+                                    const maxWidth = 500;
+                                    const aspectRatio = dimensions.width / dimensions.height;
+                                    const width = Math.min(dimensions.width, maxWidth);
+                                    const height = width / aspectRatio;
+                                    
+                                    children.push(
+                                        new Paragraph({
+                                            children: [
+                                                new ImageRun({
+                                                    data: imageBytes,
+                                                    transformation: {
+                                                        width: width * 9525,
+                                                        height: height * 9525
+                                                    }
+                                                })
+                                            ],
+                                            alignment: AlignmentType.LEFT,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                    
+                                    children.push(
+                                        new Paragraph({
+                                            text: `Foto ${j + 1} - ${problema.observacao}`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                } catch (error) {
+                                    console.error('❌ Erro ao adicionar foto ao DOCX:', error);
+                                    children.push(
+                                        new Paragraph({
+                                            text: `[Erro ao carregar foto ${j + 1}]`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                }
+                            }
+                        } else {
+                            children.push(
+                                new Paragraph({
+                                    text: "(Sem fotos anexadas)",
+                                    spacing: { after: 200 }
+                                })
+                            );
+                        }
+                    }
+                } else {
+                    children.push(
+                        new Paragraph({
+                            text: "PROBLEMAS ENCONTRADOS",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
+                    
+                    children.push(
+                        new Paragraph({
+                            text: "✓ Nenhum problema identificado na inspeção.",
+                            spacing: { after: 200 }
+                        })
+                    );
+                }
+                
+                // Criar documento
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: children
+                    }]
+                });
+                
+                // Gerar blob
+                const blob = await Packer.toBlob(doc);
+                
+                // Nome do arquivo
+                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.docx`;
+                
+                // Fazer upload para o Drive se conectado
+                if (accessToken) {
+                    try {
+                        showProgress('Enviando relatório para o Google Drive...');
+                        
+                        // Obter ou criar pasta da obra no Drive
+                        let folderId = inspection.driveFolderId;
+                        
+                        if (!folderId) {
+                            // Criar estrutura de pastas se não existir
+                            if (!SHARED_FOLDER_ID) {
+                                throw new Error('Pasta compartilhada não configurada');
+                            }
+                            
+                            await ensureSharedFolderAccess();
+                            const rootFolderId = SHARED_FOLDER_ID;
+                            
+                            const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
+                            const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                            
+                            const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
+                            const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                            
+                            const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
+                            folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                        }
+                        
+                        // Upload direto do blob para o Drive
+                        await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                        
+                        hideProgress();
+                        playSound('success');
+                        alert('✅ Relatório DOCX gerado e enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
+                        
+                        // Também fazer download local
+                        saveAs(blob, nomeArquivo);
+                        
+                    } catch (error) {
+                        console.error('Erro ao enviar para o Drive:', error);
+                        hideProgress();
+                        
+                        // Fazer download local mesmo se falhar o upload
+                        saveAs(blob, nomeArquivo);
+                        alert('✅ Relatório DOCX gerado com sucesso!\n\n⚠️ Erro ao enviar para o Google Drive. O arquivo foi baixado localmente.\n\nErro: ' + error.message);
+                    }
+                } else {
+                    // Apenas download local se não estiver conectado ao Drive
+                    saveAs(blob, nomeArquivo);
+                    hideProgress();
+                    playSound('success');
+                    alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n⚠️ Não conectado ao Google Drive. Para enviar automaticamente, configure o Drive nas Configurações.');
+                }
+                
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao gerar DOCX:', error);
+                alert('❌ Erro ao gerar DOCX. Verifique o console para mais detalhes.\n\nErro: ' + error.message);
+            }
+        }
+
+        // Download PDF Report (mantido para compatibilidade)
         async function downloadPDFReport() {
             // Validar formulário primeiro
             if (!validateForm()) {
@@ -4558,7 +5023,8 @@
                 parents: [folderId]
             };
 
-            const file = new Blob([content], { type: mimeType });
+            // Se content já for um Blob, usar diretamente; caso contrário, criar um Blob
+            const file = content instanceof Blob ? content : new Blob([content], { type: mimeType });
             const formData = new FormData();
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             formData.append('file', file);
@@ -5080,6 +5546,8 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                             ${inspection.qtdQuartos ? `<p><strong>Quartos:</strong> ${inspection.qtdQuartos}</p>` : ''}
                             ${inspection.qtdSuites ? `<p><strong>Suítes:</strong> ${inspection.qtdSuites}</p>` : ''}
                             ${inspection.qtdCozinhas ? `<p><strong>Cozinhas:</strong> ${inspection.qtdCozinhas}</p>` : ''}
+                            ${inspection.possuiQuintal ? `<p><strong>Quintal:</strong> ${inspection.possuiQuintal === 'sim' ? 'Sim' : 'Não'}</p>` : ''}
+                            ${inspection.possuiGaragem ? `<p><strong>Garagem:</strong> ${inspection.possuiGaragem === 'sim' ? 'Sim' : 'Não'}</p>` : ''}
                         </div>
                         
                         <div class="form-section">
@@ -5090,7 +5558,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     </div>
                     <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
                         <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Fechar</button>
-                        <button class="btn btn-primary" onclick="downloadInspectionReport('${inspection.id}')">📄 Baixar Relatório</button>
+                        <button class="btn btn-primary" onclick="downloadInspectionDOCX('${inspection.id}')">📄 Exportar Relatório DOCX</button>
                     </div>
                 </div>
             `;
@@ -5098,7 +5566,8 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             document.body.appendChild(modal);
         }
 
-        function downloadInspectionReport(inspectionId) {
+        // Download DOCX Report for saved inspection
+        async function downloadInspectionDOCX(inspectionId) {
             // Encontrar a inspeção
             const inspection = inspections.find(i => i.id === inspectionId);
             
@@ -5107,62 +5576,50 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 return;
             }
             
-            // Usar a mesma lógica de downloadPDFReport mas com dados da inspeção
-            if (typeof window.jspdf === 'undefined') {
-                alert('⚠️ Biblioteca jsPDF ainda está carregando. Aguarde alguns segundos e tente novamente.');
-                return;
-            }
-            
             try {
-                showProgress('Gerando relatório PDF...');
+                showProgress('Gerando relatório DOCX...');
                 
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('p', 'mm', 'a4');
+                // Verificar se a biblioteca docx está disponível
+                if (typeof docx === 'undefined') {
+                    alert('⚠️ Biblioteca docx ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                    hideProgress();
+                    return;
+                }
+
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = docx;
                 
-                let yPos = 20;
-                const pageHeight = doc.internal.pageSize.height;
-                const pageWidth = doc.internal.pageSize.width;
-                const margin = 15;
-                const maxWidth = pageWidth - (2 * margin);
+                // Array para armazenar elementos do documento
+                const children = [];
                 
-                const checkPageBreak = (neededSpace = 20) => {
-                    if (yPos + neededSpace > pageHeight - 20) {
-                        doc.addPage();
-                        yPos = 20;
-                        return true;
-                    }
-                    return false;
-                };
+                // Título do relatório
+                children.push(
+                    new Paragraph({
+                        text: "RELATÓRIO DE INSPEÇÃO RESIDENCIAL",
+                        heading: HeadingLevel.HEADING_1,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 200 }
+                    })
+                );
                 
-                // Título
-                doc.setFontSize(20);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(102, 126, 234);
-                doc.text('RELATÓRIO DE INSPEÇÃO RESIDENCIAL', margin, yPos);
-                yPos += 10;
-                
-                // Tipo
-                doc.setFontSize(14);
-                doc.setTextColor(100, 100, 100);
+                // Tipo de inspeção
                 const tipoTexto = inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA';
-                doc.text(tipoTexto, margin, yPos);
-                yPos += 15;
+                children.push(
+                    new Paragraph({
+                        text: tipoTexto,
+                        heading: HeadingLevel.HEADING_2,
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 300 }
+                    })
+                );
                 
-                // Linha
-                doc.setDrawColor(102, 126, 234);
-                doc.setLineWidth(0.5);
-                doc.line(margin, yPos, pageWidth - margin, yPos);
-                yPos += 10;
-                
-                // DADOS
-                doc.setFontSize(14);
-                doc.setTextColor(0, 0, 0);
-                doc.setFont(undefined, 'bold');
-                doc.text('DADOS DO IMÓVEL', margin, yPos);
-                yPos += 8;
-                
-                doc.setFontSize(10);
-                doc.setFont(undefined, 'normal');
+                // DADOS DO IMÓVEL
+                children.push(
+                    new Paragraph({
+                        text: "DADOS DO IMÓVEL",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { before: 200, after: 200 }
+                    })
+                );
                 
                 const dados = [
                     ['Endereço:', `${inspection.endereco}, ${inspection.numero}`],
@@ -5177,19 +5634,49 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 ];
                 
                 dados.forEach(([label, value]) => {
-                    checkPageBreak();
-                    doc.setFont(undefined, 'bold');
-                    doc.text(label, margin, yPos);
-                    doc.setFont(undefined, 'normal');
-                    doc.text(String(value), margin + 45, yPos);
-                    yPos += 6;
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: label, bold: true }),
+                                new TextRun({ text: ` ${value}` })
+                            ],
+                            spacing: { after: 100 }
+                        })
+                    );
                 });
                 
-                yPos += 10;
+                // CARACTERÍSTICAS
+                children.push(
+                    new Paragraph({
+                        text: "CARACTERÍSTICAS DO IMÓVEL",
+                        heading: HeadingLevel.HEADING_2,
+                        spacing: { before: 400, after: 200 }
+                    })
+                );
                 
-                // =====================================================
-                // SEÇÃO 1: FOTOS GERAIS DO IMÓVEL (VINDO PRIMEIRO!)
-                // =====================================================
+                const caracteristicas = [
+                    ['Pavimentos:', inspection.qtdPavimentos || 'N/A'],
+                    ['Salas:', inspection.qtdSalas || 'N/A'],
+                    ['Quartos:', inspection.qtdQuartos || 'N/A'],
+                    ['Suítes:', inspection.qtdSuites || 'N/A'],
+                    ['Cozinhas:', inspection.qtdCozinhas || 'N/A'],
+                    ['Quintal:', inspection.possuiQuintal || 'N/A'],
+                    ['Garagem:', inspection.possuiGaragem || 'N/A']
+                ];
+                
+                caracteristicas.forEach(([label, value]) => {
+                    children.push(
+                        new Paragraph({
+                            children: [
+                                new TextRun({ text: label, bold: true }),
+                                new TextRun({ text: ` ${value}` })
+                            ],
+                            spacing: { after: 100 }
+                        })
+                    );
+                });
+                
+                // FOTOS GERAIS DO IMÓVEL
                 const fotosGerais = [];
                 if (inspection.photos) {
                     Object.keys(inspection.photos).forEach(key => {
@@ -5205,74 +5692,80 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 }
                 
                 if (fotosGerais.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(102, 126, 234);
-                    doc.text('FOTOS GERAIS DO IMÓVEL', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
+                    children.push(
+                        new Paragraph({
+                            text: "FOTOS GERAIS DO IMÓVEL",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
                     
                     for (const fotoGeral of fotosGerais) {
                         if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
-                            checkPageBreak(25);
-                            
-                            doc.setFontSize(11);
-                            doc.setFont(undefined, 'bold');
-                            doc.text(fotoGeral.nome.toUpperCase(), margin, yPos);
-                            yPos += 6;
+                            children.push(
+                                new Paragraph({
+                                    text: fotoGeral.nome.toUpperCase(),
+                                    heading: HeadingLevel.HEADING_3,
+                                    spacing: { before: 200, after: 100 }
+                                })
+                            );
                             
                             for (let i = 0; i < fotoGeral.fotos.length; i++) {
-                                checkPageBreak(90);
-                                
                                 try {
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
                                     const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
                                         fotoGeral.fotos[i].data : fotoGeral.fotos[i];
                                     
-                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    const imageBytes = await base64ToUint8Array(imageData);
+                                    const dimensions = await getImageDimensions(imageData);
                                     
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`Foto ${i + 1}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
+                                    const maxWidth = 500;
+                                    const aspectRatio = dimensions.width / dimensions.height;
+                                    const width = Math.min(dimensions.width, maxWidth);
+                                    const height = width / aspectRatio;
                                     
-                                    yPos += imgHeight + 10;
+                                    children.push(
+                                        new Paragraph({
+                                            children: [
+                                                new ImageRun({
+                                                    data: imageBytes,
+                                                    transformation: {
+                                                        width: width * 9525,
+                                                        height: height * 9525
+                                                    }
+                                                })
+                                            ],
+                                            alignment: AlignmentType.LEFT,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
+                                    
+                                    children.push(
+                                        new Paragraph({
+                                            text: `Foto ${i + 1}`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
                                 } catch (error) {
-                                    console.error('❌ Erro ao adicionar foto geral ao PDF:', error);
-                                    doc.setFontSize(9);
-                                    doc.setTextColor(200, 0, 0);
-                                    doc.text(`[Erro ao carregar foto ${i + 1}]`, margin + 10, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    yPos += 6;
+                                    console.error('❌ Erro ao adicionar foto geral ao DOCX:', error);
+                                    children.push(
+                                        new Paragraph({
+                                            text: `[Erro ao carregar foto ${i + 1}]`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
                                 }
                             }
-                            
-                            yPos += 5;
                         }
                     }
-                    
-                    yPos += 10;
                 }
                 
-                // =====================================================
-                // SEÇÃO 2: PROBLEMAS ENCONTRADOS (VINDO DEPOIS!)
-                // =====================================================
-                
-                // PROBLEMAS ENCONTRADOS (COMPLETO COM FOTOS E OBSERVAÇÕES)
+                // PROBLEMAS ENCONTRADOS
                 const problemasEncontrados = [];
                 
                 if (inspection.checklist) {
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        // FILTRAR: Ignorar IDs inválidos (alertas, sistema, etc)
                         if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
@@ -5310,136 +5803,197 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 }
                 
                 if (problemasEncontrados.length > 0) {
-                    checkPageBreak(30);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.setTextColor(220, 53, 69);
-                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
-                    
-                    doc.setFontSize(10);
+                    children.push(
+                        new Paragraph({
+                            text: "PROBLEMAS ENCONTRADOS",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
                     
                     for (let i = 0; i < problemasEncontrados.length; i++) {
                         const problema = problemasEncontrados[i];
                         
-                        checkPageBreak(30);
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ 
+                                        text: `${i + 1}. ${problema.categoria} - ${problema.item}`, 
+                                        bold: true,
+                                        size: 22
+                                    })
+                                ],
+                                spacing: { before: 200, after: 100 }
+                            })
+                        );
                         
-                        // Número do problema
-                        doc.setFont(undefined, 'bold');
-                        doc.setFontSize(11);
-                        doc.text(`${i + 1}. ${problema.categoria} - ${problema.item}`, margin, yPos);
-                        yPos += 6;
-                        
-                        // Ocorrência (se houver múltiplas)
                         if (problemasEncontrados.filter(p => p.item === problema.item).length > 1) {
-                            doc.setFont(undefined, 'italic');
-                            doc.setFontSize(9);
-                            doc.setTextColor(100, 100, 100);
-                            doc.text(`(Ocorrência ${problema.ocorrencia})`, margin + 5, yPos);
-                            doc.setTextColor(0, 0, 0);
-                            yPos += 5;
+                            children.push(
+                                new Paragraph({
+                                    text: `(Ocorrência ${problema.ocorrencia})`,
+                                    spacing: { after: 100 }
+                                })
+                            );
                         }
                         
-                        // Observação
-                        doc.setFont(undefined, 'normal');
-                        doc.setFontSize(10);
-                        const obsText = `Observação: ${problema.observacao}`;
-                        const obsLines = doc.splitTextToSize(obsText, maxWidth - 10);
-                        obsLines.forEach(line => {
-                            checkPageBreak();
-                            doc.text(line, margin + 5, yPos);
-                            yPos += 5;
-                        });
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({ text: "Observação: ", bold: true }),
+                                    new TextRun({ text: problema.observacao })
+                                ],
+                                spacing: { after: 200 }
+                            })
+                        );
                         
-                        yPos += 3;
-                        
-                        // Adicionar fotos se existirem
                         if (inspection.photos && inspection.photos[problema.photoKey]) {
                             const fotos = inspection.photos[problema.photoKey];
                             
                             for (let j = 0; j < fotos.length; j++) {
-                                checkPageBreak(90);
-                                
                                 try {
-                                    const imgWidth = 80;
-                                    const imgHeight = 60;
-                                    
-                                    // CORREÇÃO: Usar foto.data se for objeto, ou foto diretamente se for string
                                     const imageData = (typeof fotos[j] === 'object' && fotos[j].data) ? fotos[j].data : fotos[j];
+                                    const imageBytes = await base64ToUint8Array(imageData);
+                                    const dimensions = await getImageDimensions(imageData);
                                     
-                                    doc.addImage(imageData, 'JPEG', margin + 10, yPos, imgWidth, imgHeight);
+                                    const maxWidth = 500;
+                                    const aspectRatio = dimensions.width / dimensions.height;
+                                    const width = Math.min(dimensions.width, maxWidth);
+                                    const height = width / aspectRatio;
                                     
-                                    doc.setFontSize(9);
-                                    doc.setFont(undefined, 'italic');
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text(`Foto ${j + 1} - ${problema.observacao}`, margin + 10, yPos + imgHeight + 4);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    doc.setFont(undefined, 'normal');
+                                    children.push(
+                                        new Paragraph({
+                                            children: [
+                                                new ImageRun({
+                                                    data: imageBytes,
+                                                    transformation: {
+                                                        width: width * 9525,
+                                                        height: height * 9525
+                                                    }
+                                                })
+                                            ],
+                                            alignment: AlignmentType.LEFT,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
                                     
-                                    yPos += imgHeight + 10;
+                                    children.push(
+                                        new Paragraph({
+                                            text: `Foto ${j + 1} - ${problema.observacao}`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
                                 } catch (error) {
-                                    console.error('❌ Erro ao adicionar foto ao PDF:', error);
-                                    console.error('📷 Dados da foto:', fotos[j]);
-                                    console.error('📋 Tipo:', typeof fotos[j]);
-                                    doc.setFontSize(9);
-                                    doc.setTextColor(200, 0, 0);
-                                    doc.text(`[Erro ao carregar foto ${j + 1}]`, margin + 10, yPos);
-                                    doc.setTextColor(0, 0, 0);
-                                    doc.setFontSize(10);
-                                    yPos += 6;
+                                    console.error('❌ Erro ao adicionar foto ao DOCX:', error);
+                                    children.push(
+                                        new Paragraph({
+                                            text: `[Erro ao carregar foto ${j + 1}]`,
+                                            spacing: { after: 200 }
+                                        })
+                                    );
                                 }
                             }
                         } else {
-                            doc.setFontSize(9);
-                            doc.setTextColor(150, 150, 150);
-                            doc.text('(Sem fotos anexadas)', margin + 10, yPos);
-                            doc.setTextColor(0, 0, 0);
-                            doc.setFontSize(10);
-                            yPos += 6;
+                            children.push(
+                                new Paragraph({
+                                    text: "(Sem fotos anexadas)",
+                                    spacing: { after: 200 }
+                                })
+                            );
                         }
-                        
-                        yPos += 8;
                     }
                 } else {
-                    checkPageBreak(20);
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.text('PROBLEMAS ENCONTRADOS', margin, yPos);
-                    yPos += 10;
+                    children.push(
+                        new Paragraph({
+                            text: "PROBLEMAS ENCONTRADOS",
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 400, after: 200 }
+                        })
+                    );
                     
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-                    doc.setTextColor(0, 150, 0);
-                    doc.text('✓ Nenhum problema identificado na inspeção.', margin, yPos);
-                    doc.setTextColor(0, 0, 0);
-                    yPos += 10;
+                    children.push(
+                        new Paragraph({
+                            text: "✓ Nenhum problema identificado na inspeção.",
+                            spacing: { after: 200 }
+                        })
+                    );
                 }
                 
-                // Rodapé
-                const totalPages = doc.internal.pages.length - 1;
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(8);
-                    doc.setTextColor(150, 150, 150);
-                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 10);
-                    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 10);
+                // Criar documento
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: children
+                    }]
+                });
+                
+                // Gerar blob
+                const blob = await Packer.toBlob(doc);
+                
+                // Nome do arquivo
+                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.docx`;
+                
+                // Fazer upload para o Drive se conectado
+                if (accessToken) {
+                    try {
+                        showProgress('Enviando relatório para o Google Drive...');
+                        
+                        // Obter ou criar pasta da obra no Drive
+                        let folderId = inspection.driveFolderId;
+                        
+                        if (!folderId) {
+                            if (!SHARED_FOLDER_ID) {
+                                throw new Error('Pasta compartilhada não configurada');
+                            }
+                            
+                            await ensureSharedFolderAccess();
+                            const rootFolderId = SHARED_FOLDER_ID;
+                            
+                            const typeFolderName = inspection.type === 'inicial' ? 'inspecao_inicial' : 'inspecao_completa';
+                            const typeFolderId = await findOrCreateFolder(typeFolderName, rootFolderId);
+                            
+                            const dateFolder = formatDate(inspection.dataVistoria).replace(/\//g, '-');
+                            const dateFolderId = await findOrCreateFolder(dateFolder, typeFolderId);
+                            
+                            const addressFolder = `${inspection.endereco}_${inspection.numero}`.replace(/[^a-zA-Z0-9]/g, '_');
+                            folderId = await findOrCreateFolder(addressFolder, dateFolderId);
+                        }
+                        
+                        // Upload direto do blob
+                        await uploadFile(blob, nomeArquivo, folderId, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                        
+                        hideProgress();
+                        playSound('success');
+                        alert('✅ Relatório DOCX gerado e enviado para o Google Drive com sucesso!\n\n📄 O arquivo foi salvo na pasta da obra.');
+                        
+                        // Também fazer download local
+                        saveAs(blob, nomeArquivo);
+                        
+                    } catch (error) {
+                        console.error('Erro ao enviar para o Drive:', error);
+                        hideProgress();
+                        
+                        // Fazer download local mesmo se falhar o upload
+                        saveAs(blob, nomeArquivo);
+                        alert('✅ Relatório DOCX gerado com sucesso!\n\n⚠️ Erro ao enviar para o Google Drive. O arquivo foi baixado localmente.\n\nErro: ' + error.message);
+                    }
+                } else {
+                    // Apenas download local se não estiver conectado ao Drive
+                    saveAs(blob, nomeArquivo);
+                    hideProgress();
+                    playSound('success');
+                    alert('✅ Relatório DOCX gerado com sucesso!\n\n📄 O arquivo foi baixado automaticamente.\n\n⚠️ Não conectado ao Google Drive. Para enviar automaticamente, configure o Drive nas Configurações.');
                 }
-                
-                // Salvar
-                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.pdf`;
-                doc.save(nomeArquivo);
-                
-                hideProgress();
-                playSound('success');
-                alert('✅ Relatório PDF gerado com sucesso!');
                 
             } catch (error) {
                 hideProgress();
-                console.error('Erro ao gerar PDF:', error);
-                alert('❌ Erro ao gerar PDF: ' + error.message);
+                console.error('Erro ao gerar DOCX:', error);
+                alert('❌ Erro ao gerar DOCX: ' + error.message);
             }
+        }
+
+        function downloadInspectionReport(inspectionId) {
+            // Função antiga mantida para compatibilidade - agora redireciona para DOCX
+            downloadInspectionDOCX(inspectionId);
         }
 
         // Confirmar deleção de inspeção
