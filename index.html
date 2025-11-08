@@ -25,10 +25,23 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- jsPDF para geração de PDFs (mantido para compatibilidade) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- docx para geração de documentos DOCX -->
-    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <!-- JSZip para geração de documentos DOCX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.4/dist/pizzip.min.js"></script>
+    <!-- docx.js para geração de documentos DOCX - usando versão estável -->
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script>
+        // Aguardar carregamento da biblioteca e verificar se está disponível
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof docx !== 'undefined') {
+                    console.log('✅ Biblioteca docx carregada:', docx);
+                } else {
+                    console.warn('⚠️ Biblioteca docx não encontrada após carregamento');
+                }
+            }, 1000);
+        });
+    </script>
     <style>
         * {
             margin: 0;
@@ -3876,13 +3889,23 @@
                 showProgress('Gerando relatório DOCX...');
                 
                 // Verificar se a biblioteca docx está disponível
-                if (typeof docx === 'undefined') {
-                    alert('⚠️ Biblioteca docx ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                // Aguardar um pouco para garantir que a biblioteca carregou
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                let docxLib = null;
+                if (typeof docx !== 'undefined') {
+                    docxLib = docx;
+                } else if (typeof window.docx !== 'undefined') {
+                    docxLib = window.docx;
+                }
+                
+                if (!docxLib) {
+                    alert('⚠️ Biblioteca docx não está disponível. Por favor, recarregue a página e tente novamente.\n\nSe o problema persistir, verifique sua conexão com a internet.');
                     hideProgress();
                     return;
                 }
 
-                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, WidthType, ImageRun } = docx;
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, WidthType, ImageRun, Media } = docxLib;
                 
                 // Array para armazenar elementos do documento
                 const children = [];
@@ -4013,11 +4036,21 @@
                                     const imageBytes = await base64ToUint8Array(imageData);
                                     const dimensions = await getImageDimensions(imageData);
                                     
-                                    // Redimensionar para caber no documento (max width 500px)
-                                    const maxWidth = 500;
+                                    // Redimensionar para caber no documento (max width 400px para evitar problemas)
+                                    const maxWidth = 400;
                                     const aspectRatio = dimensions.width / dimensions.height;
-                                    const width = Math.min(dimensions.width, maxWidth);
-                                    const height = width / aspectRatio;
+                                    let width = Math.min(dimensions.width, maxWidth);
+                                    let height = width / aspectRatio;
+                                    
+                                    // Garantir que as dimensões sejam válidas
+                                    if (width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
+                                        width = 400;
+                                        height = 300;
+                                    }
+                                    
+                                    // Converter para EMU (English Metric Units) - 1 pixel = 9525 EMU
+                                    const widthEMU = Math.round(width * 9525);
+                                    const heightEMU = Math.round(height * 9525);
                                     
                                     children.push(
                                         new Paragraph({
@@ -4025,9 +4058,10 @@
                                                 new ImageRun({
                                                     data: imageBytes,
                                                     transformation: {
-                                                        width: width * 9525, // Converter para EMU (English Metric Units)
-                                                        height: height * 9525
-                                                    }
+                                                        width: widthEMU,
+                                                        height: heightEMU
+                                                    },
+                                                    type: 'jpeg' // Especificar tipo JPEG
                                                 })
                                             ],
                                             alignment: AlignmentType.LEFT,
@@ -4155,11 +4189,21 @@
                                     const imageBytes = await base64ToUint8Array(imageData);
                                     const dimensions = await getImageDimensions(imageData);
                                     
-                                    // Redimensionar para caber no documento
-                                    const maxWidth = 500;
+                                    // Redimensionar para caber no documento (max width 400px para evitar problemas)
+                                    const maxWidth = 400;
                                     const aspectRatio = dimensions.width / dimensions.height;
-                                    const width = Math.min(dimensions.width, maxWidth);
-                                    const height = width / aspectRatio;
+                                    let width = Math.min(dimensions.width, maxWidth);
+                                    let height = width / aspectRatio;
+                                    
+                                    // Garantir que as dimensões sejam válidas
+                                    if (width <= 0 || height <= 0 || !isFinite(width) || !isFinite(height)) {
+                                        width = 400;
+                                        height = 300;
+                                    }
+                                    
+                                    // Converter para EMU (English Metric Units) - 1 pixel = 9525 EMU
+                                    const widthEMU = Math.round(width * 9525);
+                                    const heightEMU = Math.round(height * 9525);
                                     
                                     children.push(
                                         new Paragraph({
@@ -4167,9 +4211,10 @@
                                                 new ImageRun({
                                                     data: imageBytes,
                                                     transformation: {
-                                                        width: width * 9525,
-                                                        height: height * 9525
-                                                    }
+                                                        width: widthEMU,
+                                                        height: heightEMU
+                                                    },
+                                                    type: 'jpeg' // Especificar tipo JPEG
                                                 })
                                             ],
                                             alignment: AlignmentType.LEFT,
@@ -5580,13 +5625,23 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 showProgress('Gerando relatório DOCX...');
                 
                 // Verificar se a biblioteca docx está disponível
-                if (typeof docx === 'undefined') {
-                    alert('⚠️ Biblioteca docx ainda está carregando. Aguarde alguns segundos e tente novamente.');
+                // Aguardar um pouco para garantir que a biblioteca carregou
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                let docxLib = null;
+                if (typeof docx !== 'undefined') {
+                    docxLib = docx;
+                } else if (typeof window.docx !== 'undefined') {
+                    docxLib = window.docx;
+                }
+                
+                if (!docxLib) {
+                    alert('⚠️ Biblioteca docx não está disponível. Por favor, recarregue a página e tente novamente.\n\nSe o problema persistir, verifique sua conexão com a internet.');
                     hideProgress();
                     return;
                 }
 
-                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun } = docx;
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, Media } = docxLib;
                 
                 // Array para armazenar elementos do documento
                 const children = [];
@@ -5918,16 +5973,35 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     );
                 }
                 
-                // Criar documento
+                // Criar documento com configurações básicas
                 const doc = new Document({
+                    creator: "Sistema de Inspeção Residencial",
+                    title: `Relatório de Inspeção - ${inspection.type}`,
+                    description: `Relatório de inspeção residencial gerado em ${new Date().toLocaleString('pt-BR')}`,
                     sections: [{
-                        properties: {},
+                        properties: {
+                            page: {
+                                margin: {
+                                    top: 1440,    // 1 polegada = 1440 twips
+                                    right: 1440,
+                                    bottom: 1440,
+                                    left: 1440
+                                }
+                            }
+                        },
                         children: children
                     }]
                 });
                 
-                // Gerar blob
-                const blob = await Packer.toBlob(doc);
+                // Gerar blob com tratamento de erro
+                let blob;
+                try {
+                    blob = await Packer.toBlob(doc);
+                    console.log('✅ Documento DOCX gerado com sucesso, tamanho:', blob.size, 'bytes');
+                } catch (error) {
+                    console.error('❌ Erro ao gerar blob do documento:', error);
+                    throw new Error('Erro ao gerar arquivo DOCX: ' + error.message);
+                }
                 
                 // Nome do arquivo
                 const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.docx`;
