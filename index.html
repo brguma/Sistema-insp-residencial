@@ -2026,6 +2026,83 @@
         let currentUser = null; // Usuário logado
 
         // ==========================================
+        // FUNÇÕES HELPER SEGURAS
+        // ==========================================
+        
+        // Função segura para salvar no localStorage com tratamento de quota
+        function safeLocalStorageSet(key, value) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (e) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    console.error('❌ Quota do localStorage excedida');
+                    alert('⚠️ Memória local cheia! Limpe alguns dados antigos em Configurações → Gerenciar Inspeções');
+                    return false;
+                } else if (e.name === 'SecurityError') {
+                    console.error('❌ Acesso ao localStorage bloqueado (modo privado?)');
+                    alert('⚠️ Não é possível salvar dados localmente. Verifique se não está em modo de navegação privada.');
+                    return false;
+                } else {
+                    console.error('❌ Erro ao salvar no localStorage:', e);
+                    alert('⚠️ Erro ao salvar dados localmente: ' + e.message);
+                    return false;
+                }
+            }
+        }
+        
+        // Função segura para obter do localStorage com fallback
+        function safeLocalStorageGet(key, defaultValue = null) {
+            try {
+                const value = localStorage.getItem(key);
+                return value !== null ? value : defaultValue;
+            } catch (e) {
+                console.error('❌ Erro ao ler do localStorage:', e);
+                return defaultValue;
+            }
+        }
+        
+        // Função segura para fazer JSON.parse com tratamento de erro
+        function safeJSONParse(jsonString, defaultValue = null) {
+            try {
+                return JSON.parse(jsonString);
+            } catch (e) {
+                console.error('❌ Erro ao fazer parse de JSON:', e);
+                return defaultValue;
+            }
+        }
+        
+        // Função segura para fazer JSON.stringify com tratamento de erro
+        function safeJSONStringify(obj, defaultValue = '{}') {
+            try {
+                return JSON.stringify(obj);
+            } catch (e) {
+                console.error('❌ Erro ao converter para JSON:', e);
+                return defaultValue;
+            }
+        }
+        
+        // Função para limpar localStorage se estiver muito cheio (manter apenas últimas 50 inspeções)
+        function cleanupOldInspections() {
+            try {
+                const inspectionsStr = safeLocalStorageGet('inspections');
+                if (!inspectionsStr) return;
+                
+                const inspections = safeJSONParse(inspectionsStr, []);
+                if (inspections.length > 50) {
+                    // Ordenar por timestamp e manter apenas as 50 mais recentes
+                    inspections.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    const recentInspections = inspections.slice(0, 50);
+                    
+                    safeLocalStorageSet('inspections', safeJSONStringify(recentInspections));
+                    console.log(`🧹 Limpeza: removidas ${inspections.length - 50} inspeções antigas`);
+                }
+            } catch (e) {
+                console.error('❌ Erro na limpeza de inspeções antigas:', e);
+            }
+        }
+
+        // ==========================================
         // SISTEMA DE AUTENTICAÇÃO
         // ==========================================
         
@@ -2508,7 +2585,7 @@
                 console.log(`✅ Total de ${inspections.length} inspeções carregadas do Drive`);
                 
                 // Sincronizar com localStorage também
-                localStorage.setItem('inspections', JSON.stringify(inspections));
+                safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                 
             } catch (error) {
                 console.error('❌ Erro ao buscar inspeções do Drive:', error);
@@ -2557,7 +2634,7 @@
             const index = inspections.findIndex(i => i.id === inspection.id);
             if (index > -1) {
                 inspections.splice(index, 1);
-                localStorage.setItem('inspections', JSON.stringify(inspections));
+                safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                 console.log('✅ Inspeção removida localmente');
             } else {
                 console.warn('⚠️ Inspeção não encontrada no array local');
@@ -2571,7 +2648,9 @@
 
         // Save inspections to localStorage
         function saveInspections() {
-            localStorage.setItem('inspections', JSON.stringify(inspections));
+            safeLocalStorageSet('inspections', safeJSONStringify(inspections));
+            // Limpar inspeções antigas periodicamente
+            cleanupOldInspections();
         }
 
         // Show inspection type modal
@@ -3847,14 +3926,30 @@
 
         // Função auxiliar para converter base64 para Uint8Array
         async function base64ToUint8Array(base64String) {
-            // Remove o prefixo data:image/...;base64, se houver
-            const base64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
-            const binaryString = atob(base64);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            try {
+                // Validar entrada
+                if (!base64String || typeof base64String !== 'string') {
+                    throw new Error('Base64 string inválida');
+                }
+                
+                // Remove o prefixo data:image/...;base64, se houver
+                const base64 = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+                
+                // Validar formato base64
+                if (!base64 || base64.trim().length === 0) {
+                    throw new Error('String base64 vazia');
+                }
+                
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes;
+            } catch (error) {
+                console.error('❌ Erro ao converter base64 para Uint8Array:', error);
+                throw new Error('Falha ao processar imagem: ' + error.message);
             }
-            return bytes;
         }
 
         // Função auxiliar para obter dimensões da imagem
@@ -5067,7 +5162,7 @@
             if (index > -1) {
                 inspections[index] = inspection;
                 // Salvar no localStorage com os IDs atualizados
-                localStorage.setItem('inspections', JSON.stringify(inspections));
+                safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                 console.log('✅ Inspeção atualizada com IDs do Drive:', inspection.id);
             }
         }
@@ -6189,7 +6284,7 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
                     const index = inspections.findIndex(i => i.id === inspection.id);
                     if (index > -1) {
                         inspections.splice(index, 1);
-                        localStorage.setItem('inspections', JSON.stringify(inspections));
+                        safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                         alert('⚠️ Erro ao deletar do Google Drive, mas a inspeção foi removida localmente.\n\n' + error.message);
                         await loadInspections();
                         loadDatabaseView();
@@ -6291,9 +6386,10 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
         }
 
         function loadSettings() {
-            const saved = localStorage.getItem('userSettings');
+            const saved = safeLocalStorageGet('userSettings');
             if (saved) {
-                userSettings = {...userSettings, ...JSON.parse(saved)};
+                const parsedSettings = safeJSONParse(saved, {});
+                userSettings = {...userSettings, ...parsedSettings};
             }
             
             // Apply to UI
@@ -6335,9 +6431,12 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
                 customFields: userSettings.customFields
             };
             
-            localStorage.setItem('userSettings', JSON.stringify(userSettings));
-            playSound('success');
-            alert('✅ Configurações salvas com sucesso!');
+            if (safeLocalStorageSet('userSettings', safeJSONStringify(userSettings))) {
+                playSound('success');
+                alert('✅ Configurações salvas com sucesso!');
+            } else {
+                alert('⚠️ Erro ao salvar configurações. Verifique o espaço disponível.');
+            }
         }
 
         // Theme & Appearance
@@ -6470,7 +6569,7 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
             showProgress('Sincronizando com Google Drive...');
             
             try {
-                const localInspections = JSON.parse(localStorage.getItem('inspections')) || [];
+                const localInspections = safeJSONParse(safeLocalStorageGet('inspections'), []);
                 let syncCount = 0;
                 let errorCount = 0;
                 const errors = [];
@@ -6647,7 +6746,7 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
 
         // Statistics
         function loadStatistics() {
-            const inspections = JSON.parse(localStorage.getItem('inspections')) || [];
+            const inspections = safeJSONParse(safeLocalStorageGet('inspections'), []);
             const now = new Date();
             const today = now.toISOString().split('T')[0];
             const thisMonth = now.toISOString().slice(0, 7);
@@ -6745,7 +6844,7 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
         }
 
         function exportStatistics() {
-            const inspections = JSON.parse(localStorage.getItem('inspections')) || [];
+            const inspections = safeJSONParse(safeLocalStorageGet('inspections'), []);
             const stats = {
                 total: inspections.length,
                 exportDate: new Date().toISOString(),
