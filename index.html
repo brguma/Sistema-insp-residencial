@@ -5283,26 +5283,30 @@
         
         // Função auxiliar para verificar se um itemId é válido (não é um ID de sistema/alerta)
         function isValidInspectionItem(itemId) {
-            // Ignorar IDs de sistema/alertas que não são problemas reais
-            const invalidPrefixes = ['alert', 'system', 'notification', 'outros', 'undefined', 'null'];
+            // Validar se o itemId existe e é uma string válida
+            if (!itemId || typeof itemId !== 'string' || itemId.trim() === '') {
+                return false;
+            }
+            
+            // Ignorar APENAS IDs de sistema/alertas que claramente não são problemas reais
+            const invalidPrefixes = ['alert', 'system', 'notification', 'undefined', 'null'];
             const itemLower = itemId.toLowerCase();
             
-            // Retornar falso se começar com algum prefixo inválido
+            // Retornar falso APENAS se começar com prefixo claramente inválido
             for (const prefix of invalidPrefixes) {
                 if (itemLower.startsWith(prefix)) {
                     return false;
                 }
             }
             
-            // Verificar se é um ID válido de categoria conhecida
-            const validPrefixes = ['paredes', 'teto', 'piso', 'portas', 'eletrica', 'hidraulica', 'banheiro', 'cozinha', 'telhado', 'estrutura', 'fotos'];
-            for (const prefix of validPrefixes) {
-                if (itemId.startsWith(prefix)) {
-                    return true;
-                }
+            // Ignorar se o ID for literalmente 'outros' sem mais informações
+            if (itemLower === 'outros') {
+                return false;
             }
             
-            return false; // Se não for reconhecido, ignorar
+            // ACEITAR TODOS OS OUTROS ITENS - não restringir por categoria!
+            // Isso garante que NENHUM problema real seja perdido
+            return true;
         }
         
         function getItemNameFromId(itemId) {
