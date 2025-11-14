@@ -3874,6 +3874,20 @@
             });
         }
 
+        // Função auxiliar para detectar o tipo de imagem do base64
+        function getImageType(base64String) {
+            // Extrair o tipo MIME do prefixo data:image/...;base64,
+            if (base64String.startsWith('data:image/')) {
+                const mimeType = base64String.split(';')[0].split(':')[1];
+                if (mimeType.includes('png')) return 'png';
+                if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return 'jpg';
+                if (mimeType.includes('gif')) return 'gif';
+                if (mimeType.includes('bmp')) return 'bmp';
+            }
+            // Por padrão, retornar jpg se não conseguir detectar
+            return 'jpg';
+        }
+
         // Download DOCX Report
         async function downloadDOCXReport() {
             // Validar formulário primeiro
@@ -4035,6 +4049,7 @@
                                     
                                     const imageBytes = await base64ToUint8Array(imageData);
                                     const dimensions = await getImageDimensions(imageData);
+                                    const imageType = getImageType(imageData);
                                     
                                     // Redimensionar para caber no documento (max width 400px para evitar problemas)
                                     const maxWidth = 400;
@@ -4061,7 +4076,7 @@
                                                         width: widthEMU,
                                                         height: heightEMU
                                                     },
-                                                    type: 'jpeg' // Especificar tipo JPEG
+                                                    type: imageType
                                                 })
                                             ],
                                             alignment: AlignmentType.LEFT,
@@ -4188,6 +4203,7 @@
                                     const imageData = (typeof fotos[j] === 'object' && fotos[j].data) ? fotos[j].data : fotos[j];
                                     const imageBytes = await base64ToUint8Array(imageData);
                                     const dimensions = await getImageDimensions(imageData);
+                                    const imageType = getImageType(imageData);
                                     
                                     // Redimensionar para caber no documento (max width 400px para evitar problemas)
                                     const maxWidth = 400;
@@ -4214,7 +4230,7 @@
                                                         width: widthEMU,
                                                         height: heightEMU
                                                     },
-                                                    type: 'jpeg' // Especificar tipo JPEG
+                                                    type: imageType
                                                 })
                                             ],
                                             alignment: AlignmentType.LEFT,
