@@ -3063,7 +3063,8 @@
             formHTML += `
                 <div class="form-actions">
                     <button class="btn btn-secondary" onclick="backToMenu()">Cancelar</button>
-                    <button class="btn" onclick="downloadDOCXReport()" style="background: #FF5722; color: white;">📄 Exportar Relatório DOCX</button>
+                    <button class="btn" onclick="downloadHTMLReport()" style="background: #4CAF50; color: white;">🌐 Exportar HTML (Recomendado)</button>
+                    <button class="btn" onclick="downloadDOCXReport()" style="background: #FF5722; color: white;">📄 Exportar DOCX</button>
                     <button class="btn btn-success" onclick="saveInspection()">💾 Salvar Inspeção</button>
                 </div>
             `;
@@ -4482,6 +4483,399 @@
                 hideProgress();
                 console.error('Erro ao gerar DOCX:', error);
                 alert('❌ Erro ao gerar DOCX. Verifique o console para mais detalhes.\n\nErro: ' + error.message);
+            }
+        }
+
+        // Download HTML Report (RECOMENDADO - mais robusto que DOCX)
+        async function downloadHTMLReport() {
+            // Validar formulário primeiro
+            if (!validateForm()) {
+                alert('⚠️ Por favor, preencha todos os campos obrigatórios antes de gerar o relatório.');
+                return;
+            }
+            
+            // Coletar dados do formulário
+            const inspection = collectFormData();
+            
+            try {
+                showProgress('Gerando relatório HTML...');
+                
+                // Criar HTML completo
+                let html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Inspeção - ${inspection.endereco}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            font-size: 32px;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 24px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        h3 {
+            color: #764ba2;
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        .problem-item {
+            background: #f9f9f9;
+            border-left: 4px solid #ff5722;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        
+        .problem-title {
+            font-weight: bold;
+            color: #ff5722;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .problem-observation {
+            color: #555;
+            margin: 10px 0;
+            font-style: italic;
+        }
+        
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .photo-item {
+            text-align: center;
+        }
+        
+        .photo-item img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 8px;
+        }
+        
+        .photo-caption {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .no-problems {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 20px;
+            border-radius: 4px;
+            color: #2e7d32;
+            font-weight: 500;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            .photo-item img {
+                max-width: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RELATÓRIO DE INSPEÇÃO RESIDENCIAL</h1>
+        <p class="subtitle">${inspection.type === 'inicial' ? 'INSPEÇÃO INICIAL' : 'INSPEÇÃO COMPLETA'}</p>
+        
+        <h2>📋 DADOS DO IMÓVEL</h2>
+        <div class="info-grid">
+            <div class="info-label">Endereço:</div>
+            <div class="info-value">${inspection.endereco}, ${inspection.numero}</div>
+            
+            <div class="info-label">Complemento:</div>
+            <div class="info-value">${inspection.complemento || 'N/A'}</div>
+            
+            <div class="info-label">Bairro:</div>
+            <div class="info-value">${inspection.bairro}</div>
+            
+            <div class="info-label">Município/UF:</div>
+            <div class="info-value">${inspection.municipio} - ${inspection.uf}</div>
+            
+            <div class="info-label">Data da Vistoria:</div>
+            <div class="info-value">${inspection.dataVistoria}</div>
+            
+            <div class="info-label">Hora da Vistoria:</div>
+            <div class="info-value">${inspection.horaVistoria}</div>
+            
+            <div class="info-label">Acompanhante:</div>
+            <div class="info-value">${inspection.acompanhante}</div>
+            
+            <div class="info-label">Idade do Imóvel:</div>
+            <div class="info-value">${inspection.idadeImovel} anos</div>
+        </div>
+        
+        <h2>🏠 CARACTERÍSTICAS DO IMÓVEL</h2>
+        <div class="info-grid">
+            <div class="info-label">Pavimentos:</div>
+            <div class="info-value">${inspection.qtdPavimentos || 'N/A'}</div>
+            
+            <div class="info-label">Salas:</div>
+            <div class="info-value">${inspection.qtdSalas || 'N/A'}</div>
+            
+            <div class="info-label">Quartos:</div>
+            <div class="info-value">${inspection.qtdQuartos || 'N/A'}</div>
+            
+            <div class="info-label">Suítes:</div>
+            <div class="info-value">${inspection.qtdSuites || 'N/A'}</div>
+            
+            <div class="info-label">Cozinhas:</div>
+            <div class="info-value">${inspection.qtdCozinhas || 'N/A'}</div>
+            
+            <div class="info-label">Quintal:</div>
+            <div class="info-value">${inspection.possuiQuintal || 'N/A'}</div>
+            
+            <div class="info-label">Garagem:</div>
+            <div class="info-value">${inspection.possuiGaragem || 'N/A'}</div>
+        </div>
+`;
+                
+                // FOTOS GERAIS DO IMÓVEL
+                const fotosGerais = [];
+                if (inspection.photos) {
+                    Object.keys(inspection.photos).forEach(key => {
+                        if (key.startsWith('fotos_')) {
+                            const nomeLimpo = key.replace('fotos_', '').replace(/\d+$/, '').replace(/_/g, ' ');
+                            fotosGerais.push({
+                                key: key,
+                                nome: nomeLimpo.charAt(0).toUpperCase() + nomeLimpo.slice(1),
+                                fotos: inspection.photos[key]
+                            });
+                        }
+                    });
+                }
+                
+                if (fotosGerais.length > 0) {
+                    html += `<h2>📸 FOTOS GERAIS DO IMÓVEL</h2>`;
+                    
+                    for (const fotoGeral of fotosGerais) {
+                        if (fotoGeral.fotos && fotoGeral.fotos.length > 0) {
+                            html += `<h3>${fotoGeral.nome.toUpperCase()}</h3>`;
+                            html += `<div class="photos-grid">`;
+                            
+                            for (let i = 0; i < fotoGeral.fotos.length; i++) {
+                                const imageData = (typeof fotoGeral.fotos[i] === 'object' && fotoGeral.fotos[i].data) ? 
+                                    fotoGeral.fotos[i].data : fotoGeral.fotos[i];
+                                
+                                html += `
+                                    <div class="photo-item">
+                                        <img src="${imageData}" alt="Foto ${i + 1}">
+                                        <div class="photo-caption">Foto ${i + 1}</div>
+                                    </div>
+                                `;
+                            }
+                            
+                            html += `</div>`;
+                        }
+                    }
+                }
+                
+                // PROBLEMAS ENCONTRADOS
+                const problemasEncontrados = [];
+                
+                if (inspection.checklist) {
+                    Object.keys(inspection.checklist).forEach(itemId => {
+                        const item = inspection.checklist[itemId];
+                        
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                            const categoryName = getCategoryNameFromId(itemId);
+                            const itemName = getItemNameFromId(itemId);
+                            
+                            if (item.occurrences && item.occurrences.length > 0) {
+                                item.occurrences.forEach((occ, index) => {
+                                    const occNum = occ.occurrenceNum || (index + 1);
+                                    problemasEncontrados.push({
+                                        categoria: categoryName,
+                                        item: itemName,
+                                        ocorrencia: occNum,
+                                        observacao: occ.observation || 'Sem observação',
+                                        photoKey: `${itemId}_${occNum}`
+                                    });
+                                });
+                            } else if (item.observation) {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: item.observation,
+                                    photoKey: `${itemId}_1`
+                                });
+                            } else {
+                                problemasEncontrados.push({
+                                    categoria: categoryName,
+                                    item: itemName,
+                                    ocorrencia: 1,
+                                    observacao: 'Problema identificado',
+                                    photoKey: `${itemId}_1`
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                html += `<h2>⚠️ PROBLEMAS ENCONTRADOS</h2>`;
+                
+                if (problemasEncontrados.length > 0) {
+                    for (let i = 0; i < problemasEncontrados.length; i++) {
+                        const problema = problemasEncontrados[i];
+                        
+                        html += `
+                            <div class="problem-item">
+                                <div class="problem-title">${i + 1}. ${problema.categoria} - ${problema.item}</div>
+                                ${problemasEncontrados.filter(p => p.item === problema.item).length > 1 ? 
+                                    `<div>(Ocorrência ${problema.ocorrencia})</div>` : ''}
+                                <div class="problem-observation"><strong>Observação:</strong> ${problema.observacao}</div>
+                        `;
+                        
+                        // Adicionar fotos se existirem
+                        if (inspection.photos && inspection.photos[problema.photoKey]) {
+                            const fotos = inspection.photos[problema.photoKey];
+                            
+                            html += `<div class="photos-grid">`;
+                            
+                            for (let j = 0; j < fotos.length; j++) {
+                                const imageData = (typeof fotos[j] === 'object' && fotos[j].data) ? fotos[j].data : fotos[j];
+                                
+                                html += `
+                                    <div class="photo-item">
+                                        <img src="${imageData}" alt="Foto do problema ${j + 1}">
+                                        <div class="photo-caption">Foto ${j + 1}</div>
+                                    </div>
+                                `;
+                            }
+                            
+                            html += `</div>`;
+                        }
+                        
+                        html += `</div>`;
+                    }
+                } else {
+                    html += `<div class="no-problems">✓ Nenhum problema identificado na inspeção.</div>`;
+                }
+                
+                // Footer
+                html += `
+        <div class="footer">
+            <p><strong>Relatório gerado em:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <p><strong>Sistema de Inspeção Residencial</strong> - Eng. Bruno Machado</p>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">
+                💡 <strong>Dica:</strong> Para imprimir como PDF, pressione Ctrl+P (Windows) ou Cmd+P (Mac) e escolha "Salvar como PDF"<br>
+                💡 Para abrir no Word e salvar como DOCX, clique com botão direito no arquivo → Abrir com → Microsoft Word
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+                
+                // Criar blob e fazer download
+                const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+                const nomeArquivo = `Relatorio_${inspection.type}_${inspection.municipio.replace(/\s+/g, '_')}_${inspection.dataVistoria.replace(/\//g, '-')}.html`;
+                
+                saveAs(blob, nomeArquivo);
+                hideProgress();
+                playSound('success');
+                
+                alert(`✅ Relatório HTML gerado com sucesso!
+
+📁 Arquivo: ${nomeArquivo}
+
+💡 COMO USAR:
+1. Abra o arquivo no navegador para visualizar
+2. Para PDF: Abra no navegador → Ctrl+P → Salvar como PDF
+3. Para DOCX: Clique com botão direito → Abrir com → Word → Salvar como DOCX
+
+✨ O HTML é mais confiável e não corrompe!`);
+                
+            } catch (error) {
+                hideProgress();
+                console.error('Erro ao gerar HTML:', error);
+                alert('❌ Erro ao gerar HTML: ' + error.message);
             }
         }
 
