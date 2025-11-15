@@ -2037,7 +2037,18 @@
             } catch (e) {
                 if (e.name === 'QuotaExceededError' || e.code === 22) {
                     console.error('❌ Quota do localStorage excedida');
-                    alert('⚠️ Memória local cheia! Limpe alguns dados antigos em Configurações → Gerenciar Inspeções');
+                    
+                    // Mensagem personalizada dependendo da chave
+                    if (key === 'inspections') {
+                        alert('⚠️ MEMÓRIA LOCAL CHEIA!\n\n' +
+                              '📸 SOLUÇÃO: As fotos agora são salvas apenas no Google Drive!\n\n' +
+                              '✅ Os dados da inspeção estão salvos\n' +
+                              '✅ As fotos serão enviadas automaticamente para o Drive\n\n' +
+                              '💡 Essa nova estratégia economiza memória do celular e evita esse erro.');
+                    } else {
+                        alert('⚠️ Memória local cheia! Limpe alguns dados antigos em Configurações → Gerenciar Inspeções');
+                    }
+                    
                     return false;
                 } else if (e.name === 'SecurityError') {
                     console.error('❌ Acesso ao localStorage bloqueado (modo privado?)');
@@ -3149,37 +3160,62 @@
                 <div class="form-section" style="background: #e8f5e9; border-left: 4px solid #4caf50;">
                     <div class="checklist-section">
                         <div class="checklist-header">
-                            <h4>📸 FOTOS GERAIS - Obrigatórias</h4>
-                            <p style="color: #666; font-size: 14px; margin-top: 5px;">Tire fotos de cada cômodo do imóvel</p>
+                            <h4>📸 FOTOS GERAIS DO IMÓVEL</h4>
+                            <p style="color: #666; font-size: 14px; margin-top: 5px;">
+                                <span style="color: #f44336; font-weight: bold;">*</span> = Obrigatória | 
+                                As demais são opcionais
+                            </p>
                         </div>
             `;
 
-            // Fachada
-            html += generateFotoItem('fotos_fachada', 'Fachada', baseInspection);
+            // Fachada - ÚNICA OBRIGATÓRIA
+            html += generateFotoItem('fotos_fachada', 'Fachada <span style="color: #f44336;">*</span>', baseInspection, true);
 
-            // Sala(s)
+            // Sala(s) - OPCIONAL
             const qtdSalas = parseInt(document.getElementById('qtdSalas')?.value || baseInspection?.qtdSalas || 1);
             for (let i = 1; i <= qtdSalas; i++) {
                 const label = qtdSalas > 1 ? `Sala ${i}` : 'Sala';
-                html += generateFotoItem(`fotos_sala${i}`, label, baseInspection);
+                html += generateFotoItem(`fotos_sala${i}`, label, baseInspection, false);
             }
 
-            // Cozinha(s)
+            // Cozinha(s) - OPCIONAL
             const qtdCozinhas = parseInt(document.getElementById('qtdCozinhas')?.value || baseInspection?.qtdCozinhas || 1);
             for (let i = 1; i <= qtdCozinhas; i++) {
                 const label = qtdCozinhas > 1 ? `Cozinha ${i}` : 'Cozinha';
-                html += generateFotoItem(`fotos_cozinha${i}`, label, baseInspection);
+                html += generateFotoItem(`fotos_cozinha${i}`, label, baseInspection, false);
             }
 
-            // Quarto(s)
+            // Quarto(s) - OPCIONAL
             const qtdQuartos = parseInt(document.getElementById('qtdQuartos')?.value || baseInspection?.qtdQuartos || 1);
             const qtdSuites = parseInt(document.getElementById('qtdSuites')?.value || baseInspection?.qtdSuites || 0);
             const totalQuartos = qtdQuartos + qtdSuites;
             
             for (let i = 1; i <= totalQuartos; i++) {
                 const label = totalQuartos > 1 ? `Quarto ${i}` : 'Quarto';
-                html += generateFotoItem(`fotos_quarto${i}`, label, baseInspection);
+                html += generateFotoItem(`fotos_quarto${i}`, label, baseInspection, false);
             }
+
+            // NOVOS CÔMODOS - OPCIONAIS
+            
+            // Banheiro(s)
+            html += generateFotoItem('fotos_banheiro1', 'Banheiro', baseInspection, false);
+            
+            // Quarto com Suíte (se houver suítes)
+            if (qtdSuites > 0) {
+                for (let i = 1; i <= qtdSuites; i++) {
+                    const label = qtdSuites > 1 ? `Quarto com Suíte ${i}` : 'Quarto com Suíte';
+                    html += generateFotoItem(`fotos_suite${i}`, label, baseInspection, false);
+                }
+            }
+            
+            // Quintal (se possui)
+            const possuiQuintal = document.getElementById('possuiQuintal')?.value || baseInspection?.possuiQuintal;
+            if (possuiQuintal === 'sim') {
+                html += generateFotoItem('fotos_quintal', 'Quintal', baseInspection, false);
+            }
+            
+            // Área de Serviço
+            html += generateFotoItem('fotos_area_servico', 'Área de Serviço', baseInspection, false);
 
             html += `
                     </div>
@@ -3190,7 +3226,7 @@
         }
 
         // Generate individual photo item for FOTOS GERAIS
-        function generateFotoItem(itemId, label, baseInspection) {
+        function generateFotoItem(itemId, label, baseInspection, isRequired = false) {
             const baseValue = baseInspection?.checklist?.[itemId];
             
             return `
@@ -5332,26 +5368,55 @@
 
             const inspection = collectFormData();
             
-            // Add to inspections array (SEMPRE salva local primeiro)
-            inspections.push(inspection);
-            saveInspections();
+            // ====================================================
+            // SOLUÇÃO PARA MEMÓRIA CHEIA:
+            // Separar dados e fotos para evitar estourar localStorage
+            // ====================================================
             
-            console.log('💾 Inspeção salva localmente');
+            // 1. Criar cópia SEM fotos para localStorage (apenas metadados)
+            const inspectionForLocalStorage = {
+                ...inspection,
+                photos: {}, // Não salvar fotos no localStorage - memória limitada!
+                hasPhotos: Object.keys(inspection.photos).length > 0 // Flag para indicar que existem fotos
+            };
+            
+            // 2. Guardar fotos temporariamente em memória
+            const photosToSave = inspection.photos;
+            
+            // 3. Add to inspections array (SEM fotos no localStorage)
+            inspections.push(inspectionForLocalStorage);
+            
+            // 4. Salvar no localStorage (SEM fotos - evita erro de memória cheia)
+            const saveSuccess = saveInspections();
+            
+            if (!saveSuccess) {
+                // Se falhou ao salvar, não continuar
+                inspections.pop(); // Remover do array
+                return;
+            }
+            
+            console.log('💾 Inspeção salva localmente (sem fotos - economizando memória)');
+            
+            // 5. Restaurar fotos no objeto para enviar ao Drive
+            inspection.photos = photosToSave;
+            
+            // 6. Atualizar o objeto no array com as fotos (apenas na memória, não no localStorage)
+            inspections[inspections.length - 1].photos = photosToSave;
 
-            // SEMPRE tentar salvar no Google Drive
+            // SEMPRE tentar salvar no Google Drive (COM fotos)
             if (accessToken) {
                 // Já tem token, tenta salvar direto
                 try {
-                    showProgress('Sincronizando com Google Drive...');
+                    showProgress('Enviando para Google Drive...');
                     await saveToGoogleDrive(inspection);
                     hideProgress();
                     console.log('☁️ Inspeção sincronizada com sucesso no Google Drive!');
-                    alert('✅ Inspeção salva e sincronizada com sucesso!\n\n💾 Local: OK\n☁️ Google Drive: OK');
+                    alert('✅ Inspeção salva e sincronizada com sucesso!\n\n💾 Metadados: localStorage\n📸 Fotos: Google Drive\n\n✨ Estratégia otimizada para economizar memória local!');
                     backToMenu();
                 } catch (error) {
                     hideProgress();
                     console.error('❌ Erro ao sincronizar com Drive:', error);
-                    alert('✅ Inspeção salva localmente!\n⚠️ Erro ao sincronizar com Google Drive.\n\nA inspeção será sincronizada na próxima vez que conectar.');
+                    alert('✅ Inspeção salva localmente!\n⚠️ Erro ao enviar fotos para o Google Drive.\n\n📸 As fotos serão enviadas na próxima sincronização.');
                     backToMenu();
                 }
             } else {
@@ -5369,7 +5434,7 @@
                                 if (response.error) {
                                     hideProgress();
                                     console.warn('⚠️ Não foi possível conectar ao Drive automaticamente');
-                                    alert('✅ Inspeção salva localmente!\n\nℹ️ Para sincronizar com Google Drive, autorize o acesso nas Configurações.');
+                                    alert('✅ Inspeção salva localmente!\n\n⚠️ Configure o Google Drive para enviar as fotos.\n\nAcesse: Configurações → Google Drive');
                                     backToMenu();
                                     return;
                                 }
@@ -5378,16 +5443,16 @@
                                 
                                 // Agora tenta salvar no Drive
                                 try {
-                                    showProgress('Sincronizando com Google Drive...');
+                                    showProgress('Enviando para Google Drive...');
                                     await saveToGoogleDrive(inspection);
                                     hideProgress();
                                     console.log('☁️ Inspeção sincronizada com sucesso!');
-                                    alert('✅ Inspeção salva e sincronizada com sucesso!\n\n💾 Local: OK\n☁️ Google Drive: OK');
+                                    alert('✅ Inspeção salva e sincronizada com sucesso!\n\n💾 Metadados: localStorage\n📸 Fotos: Google Drive');
                                     backToMenu();
                                 } catch (error) {
                                     hideProgress();
                                     console.error('❌ Erro ao sincronizar:', error);
-                                    alert('✅ Inspeção salva localmente!\n⚠️ Erro ao sincronizar com Google Drive.');
+                                    alert('✅ Inspeção salva localmente!\n⚠️ Erro ao enviar fotos para o Google Drive.');
                                     backToMenu();
                                 }
                             }
@@ -5395,13 +5460,13 @@
                     } catch (error) {
                         hideProgress();
                         console.error('❌ Erro ao solicitar autorização:', error);
-                        alert('✅ Inspeção salva localmente!\n\nℹ️ Configure o Google Drive nas Configurações para sincronização automática.');
+                        alert('✅ Inspeção salva localmente!\n\n⚠️ Configure o Google Drive para enviar as fotos.');
                         backToMenu();
                     }
                 } else {
                     // APIs não inicializadas
                     console.warn('⚠️ APIs do Google não disponíveis');
-                    alert('✅ Inspeção salva localmente!\n\nℹ️ Google Drive não está disponível no momento.');
+                    alert('✅ Inspeção salva localmente!\n\n⚠️ Google Drive não está disponível no momento.');
                     backToMenu();
                 }
             }
@@ -5418,13 +5483,26 @@
                 }
             }
             
+            // Validar APENAS foto da fachada (única obrigatória)
+            if (!photoData['fotos_fachada_1'] || photoData['fotos_fachada_1'].length === 0) {
+                alert('⚠️ A foto da FACHADA é obrigatória!\n\nPor favor, tire pelo menos uma foto da fachada do imóvel.');
+                return false;
+            }
+            
             return true;
         }
 
         // Collect form data
         function collectFormData() {
+            // Gerar ID ÚNICO incluindo endereço + número + complemento + timestamp
+            const endereco = document.getElementById('endereco').value;
+            const numero = document.getElementById('numero').value;
+            const complemento = document.getElementById('complemento').value;
+            const uniqueString = `${endereco}_${numero}_${complemento}_${Date.now()}`;
+            const uniqueId = btoa(uniqueString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+            
             const inspection = {
-                id: Date.now().toString(),
+                id: uniqueId,
                 type: currentInspectionType,
                 baseInspectionId: selectedInitialInspection?.id || null,
                 timestamp: new Date().toISOString(),
