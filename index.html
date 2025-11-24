@@ -2546,22 +2546,8 @@
                         inspections = JSON.parse(stored);
                         console.log(`📦 ${inspections.length} inspeções carregadas do localStorage`);
                         
-                        // IMPORTANTE: Limpar fotos do localStorage de inspeções antigas para economizar espaço
-                        let needsCleanup = false;
-                        inspections.forEach(inspection => {
-                            if (inspection.photos && Object.keys(inspection.photos).length > 0) {
-                                // Inspeção antiga com fotos no localStorage
-                                console.log(`🧹 Limpando fotos antigas da inspeção: ${inspection.id}`);
-                                inspection.hasPhotos = true;
-                                inspection.photos = {}; // Limpar fotos para economizar espaço
-                                needsCleanup = true;
-                            }
-                        });
-                        
-                        if (needsCleanup) {
-                            console.log('🧹 Salvando inspeções sem fotos antigas no localStorage...');
-                            safeLocalStorageSet('inspections', safeJSONStringify(inspections));
-                        }
+                        // NÃO limpar fotos de inspeções antigas - elas precisam das fotos para exportação!
+                        // Apenas novas inspeções não salvam fotos no localStorage
                         
                     } catch (parseError) {
                         console.error('❌ Erro ao fazer parse do localStorage:', parseError);
@@ -2655,11 +2641,8 @@
                                             inspection.driveFileId = fileId;
                                             inspection.driveFolderId = addressFolder.id;
                                             
-                                            // Garantir que não tenha fotos no objeto (economizar memória)
-                                            if (inspection.photos && Object.keys(inspection.photos).length > 0) {
-                                                inspection.hasPhotos = true;
-                                                inspection.photos = {}; // Limpar fotos
-                                            }
+                                            // NÃO remover fotos de inspeções antigas!
+                                            // As fotos são necessárias para exportação
                                             
                                             inspections.push(inspection);
                                             console.log(`  ✅ Inspeção carregada: ${inspection.endereco}, ${inspection.numero}`);
@@ -2682,7 +2665,7 @@
 
                 console.log(`✅ Total de ${inspections.length} inspeções carregadas do Drive`);
                 
-                // Sincronizar com localStorage também (SEM FOTOS)
+                // Sincronizar com localStorage também (COM fotos - necessário para exportação)
                 safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                 
             } catch (error) {
