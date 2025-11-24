@@ -4273,7 +4273,7 @@
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        if (item.status === 'issue') {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -4828,7 +4828,7 @@
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        if (item.status === 'issue') {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -5153,7 +5153,7 @@
                         const item = inspection.checklist[itemId];
                         
                         // FILTRAR: Ignorar IDs inválidos (alertas, sistema, etc)
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        if (item.status === 'issue') {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -6475,7 +6475,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        if (item.status === 'issue') {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -6868,11 +6868,18 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 // PROBLEMAS ENCONTRADOS
                 const problemasEncontrados = [];
                 
+                // LOGS DE DEBUG DETALHADOS
+                console.log("📊 ===== HTML EXPORT: INÍCIO =====");
+                console.log("📋 Total de chaves no checklist:", inspection.checklist ? Object.keys(inspection.checklist).length : 0);
+                console.log("📋 Chaves:", inspection.checklist ? Object.keys(inspection.checklist) : []);
+                
                 if (inspection.checklist) {
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        if (item.status === 'issue') {
+                        
+                        console.log(`🔍 Processando: ${itemId}, Status: ${item.status}`);
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -6911,6 +6918,9 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 html += `<h2>⚠️ PROBLEMAS ENCONTRADOS</h2>`;
                 
                 if (problemasEncontrados.length > 0) {
+                
+                console.log(`📊 ===== TOTAL: ${problemasEncontrados.length} PROBLEMAS COLETADOS =====`);
+                console.log("📋 Lista completa:", problemasEncontrados);
                     for (let i = 0; i < problemasEncontrados.length; i++) {
                         const problema = problemasEncontrados[i];
                         
