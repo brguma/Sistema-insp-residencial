@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inspeção Residencial - v3.4 (Modo Híbrido de Memória)</title>
+    <title>Sistema de Inspeção Residencial - v3.3 (Drive Pré-Configurado)</title>
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -1272,6 +1272,19 @@
             <p style="margin-top: 20px; color: #999; font-size: 12px; text-align: center;">
                 Acesso restrito • Usuários autorizados apenas
             </p>
+            
+            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                <p style="margin: 0; font-size: 12px; color: #856404; text-align: center;">
+                    <b>🔑 Login Padrão:</b><br/>
+                    Usuário: <code style="background: white; padding: 2px 6px; border-radius: 3px;">admin</code><br/>
+                    Senha: <code style="background: white; padding: 2px 6px; border-radius: 3px;">admin123</code>
+                </p>
+            </div>
+            
+            <button onclick="if(confirm('⚠️ ATENÇÃO: Isso resetará TODOS os usuários do sistema e criará apenas o usuário admin padrão.\\n\\n❌ Os dados de login serão perdidos!\\n✅ As inspeções não serão afetadas.\\n\\nDeseja continuar?')) { localStorage.removeItem(\'systemUsers\'); localStorage.removeItem(\'currentUser\'); location.reload(); }" 
+                    style="margin-top: 10px; width: 100%; padding: 10px; background: #f44336; color: white; border: none; border-radius: 5px; font-size: 12px; cursor: pointer;">
+                🔄 Resetar Sistema de Login
+            </button>
         </div>
 
         <!-- Admin Panel (User Management) -->
@@ -1558,15 +1571,6 @@
                             <button class="btn btn-primary" onclick="syncWithDrive()">↻ Sincronizar</button>
                         </div>
                     </div>
-                    <div class="settings-item" style="border: 2px solid #FF9800; background: #fff3cd; padding: 15px; border-radius: 10px;">
-                        <div class="settings-item-info">
-                            <div class="settings-item-title" style="color: #FF9800;">🔄 Sincronizar e Liberar Memória</div>
-                            <div class="settings-item-desc">Envia inspeções antigas para o Drive e mantém apenas as 30 mais recentes localmente</div>
-                        </div>
-                        <div class="settings-item-control">
-                            <button class="btn btn-success" onclick="syncOldInspections()" style="font-weight: 600;">🧹 Limpar Memória</button>
-                        </div>
-                    </div>
                     <div class="settings-item">
                         <div class="settings-item-info">
                             <div class="settings-item-title">Última Sincronização</div>
@@ -1580,7 +1584,7 @@
                     <div class="info-card" style="background: white; border-color: #FF9800;">
                         <h4 style="color: #FF9800;">📌 Como Configurar:</h4>
                         <p style="margin: 5px 0; line-height: 1.8; color: #333;">
-                            <strong>1.</strong> Acesse o Drive do <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cba9b9bea5a4a6aaa8a3aaafa4e5a9a6a8a4a5b8bea7bfa4b9a2aa8baca6aaa2a7e5a8a4a6">[email&#160;protected]</a></code><br>
+                            <strong>1.</strong> Acesse o Drive do <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">brunomachado.bmconsultoria@gmail.com</code><br>
                             <strong>2.</strong> Crie uma pasta (ex: "Inspeções BM Consultoria")<br>
                             <strong>3.</strong> Clique com botão direito → <strong>Compartilhar</strong><br>
                             <strong>4.</strong> Configure: <strong>"Qualquer pessoa com o link pode editar"</strong><br>
@@ -1753,11 +1757,6 @@
                         <div class="stat-value" id="totalPhotos">0</div>
                         <div class="stat-label">Total de Fotos</div>
                     </div>
-                    <div class="stat-card" style="border: 2px solid #FF9800;">
-                        <div class="stat-value" id="memoryUsage" style="color: #FF9800;">0 MB</div>
-                        <div class="stat-label">💾 Memória Local</div>
-                        <div style="font-size: 11px; color: #666; margin-top: 5px;" id="memoryPercent">0%</div>
-                    </div>
                 </div>
 
                 <div class="settings-group">
@@ -1911,7 +1910,7 @@
                         <div class="settings-item-info">
                             <div class="settings-item-title">Contato e Suporte</div>
                             <div class="settings-item-desc">
-                                📧 <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2643484143484e434f544944545348494b47454e47424966414b474f4a0845494b">[email&#160;protected]</a><br>
+                                📧 engenheirobrunomachado@gmail.com<br>
                                 📱 (21) 99497-2971
                             </div>
                         </div>
@@ -1955,7 +1954,7 @@
         </div>
     </div>
 
-    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    <script>
         // Configuration - SUBSTITUA AQUI SUAS CREDENCIAIS
         const CLIENT_ID = '756155400991-gle9g8l22p3a8h9at5uu5djijtqat9lu.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyDTduz53nKthvO9sR1cvHNmD1DK4IDazlM';
@@ -2037,263 +2036,6 @@
         let currentInspectionType = null;
         let selectedInitialInspection = null;
         let photoData = {};
-
-        // ==========================================
-        // FUNÇÃO DE COMPRESSÃO DE IMAGENS - CORREÇÃO CRÍTICA
-        // ==========================================
-        
-        // Função para comprimir imagem antes de salvar
-        async function compressImageBeforeSave(dataURL) {
-            const MAX_WIDTH = 1280;
-            const MAX_HEIGHT = 720;
-            const QUALITY = 0.7; // Reduzir qualidade para economizar espaço
-            
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = function() {
-                    try {
-                        let width = img.width;
-                        let height = img.height;
-                        
-                        // Se imagem já é pequena, não redimensionar
-                        if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
-                            // Ainda assim, recomprimir com qualidade menor
-                            const canvas = document.createElement('canvas');
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, width, height);
-                            const compressed = canvas.toDataURL('image/jpeg', QUALITY);
-                            console.log(`📸 Recompressão: ${(dataURL.length/1024).toFixed(0)}KB → ${(compressed.length/1024).toFixed(0)}KB`);
-                            resolve(compressed);
-                            return;
-                        }
-                        
-                        // Calcular novo tamanho
-                        const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-                        width = Math.floor(width * ratio);
-                        height = Math.floor(height * ratio);
-                        
-                        // Criar canvas para redimensionar
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = 'white';
-                        ctx.fillRect(0, 0, width, height);
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // Converter para JPEG com qualidade reduzida
-                        const compressed = canvas.toDataURL('image/jpeg', QUALITY);
-                        
-                        // Log do resultado
-                        const originalSize = dataURL.length;
-                        const compressedSize = compressed.length;
-                        const reduction = ((1 - compressedSize/originalSize) * 100).toFixed(1);
-                        console.log(`📸 Compressão: ${(originalSize/1024).toFixed(0)}KB → ${(compressedSize/1024).toFixed(0)}KB (-${reduction}%)`);
-                        
-                        resolve(compressed);
-                    } catch (error) {
-                        console.error('Erro na compressão:', error);
-                        resolve(dataURL); // Retornar original em caso de erro
-                    }
-                };
-                img.onerror = function() {
-                    console.error('Erro ao carregar imagem para compressão');
-                    resolve(dataURL); // Retornar original em caso de erro
-                };
-                img.src = dataURL;
-            });
-        }
-
-        // Função para monitorar uso do localStorage
-        function getLocalStorageUsage() {
-            let total = 0;
-            try {
-                for (let key in localStorage) {
-                    if (localStorage.hasOwnProperty(key)) {
-                        total += localStorage[key].length + key.length;
-                    }
-                }
-            } catch (e) {
-                console.error('Erro ao calcular uso do localStorage:', e);
-            }
-            return {
-                bytes: total,
-                mb: (total / 1024 / 1024).toFixed(2)
-            };
-        }
-
-        // Verificar saúde do armazenamento - MODO HÍBRIDO
-        function checkStorageHealth() {
-            const usage = getLocalStorageUsage();
-            const usageMB = parseFloat(usage.mb);
-            const percentUsed = (usageMB / 10) * 100; // Assumindo ~10MB de limite
-            
-            console.log(`💾 Uso do localStorage: ${usage.mb}MB (${percentUsed.toFixed(1)}%)`);
-            
-            // 🔴 CRÍTICO (>80%) - Sincronizar obrigatoriamente
-            if (usageMB > 8) {
-                offerMemorySync('critical', usage.mb, percentUsed);
-                return false;
-            } 
-            // 🟡 ALERTA (70-80%) - Oferecer sincronização
-            else if (usageMB > 7) {
-                offerMemorySync('warning', usage.mb, percentUsed);
-                return true;
-            } 
-            // 🟢 OK (<70%)
-            else if (usageMB > 5) {
-                console.warn(`⚠️ Armazenamento em ${usage.mb}MB (${percentUsed.toFixed(1)}%) - tudo sob controle`);
-            }
-            return true;
-        }
-
-        // Oferecer sincronização de memória - MODO HÍBRIDO
-        async function offerMemorySync(level, usageMB, percentUsed) {
-            const inspectionsStr = safeLocalStorageGet('inspections');
-            if (!inspectionsStr) return;
-            
-            const allInspections = safeJSONParse(inspectionsStr, []);
-            const totalInspections = allInspections.length;
-            const oldInspections = totalInspections > 30 ? totalInspections - 30 : 0;
-            
-            if (level === 'critical') {
-                // 🔴 CRÍTICO - Mensagem mais urgente
-                const message = `🔴 MEMÓRIA CRÍTICA!\n\n` +
-                    `📊 Uso: ${usageMB}MB (${percentUsed.toFixed(1)}%)\n` +
-                    `📋 Total de inspeções: ${totalInspections}\n` +
-                    `📤 Inspeções antigas: ${oldInspections}\n\n` +
-                    `⚡ AÇÃO NECESSÁRIA:\n` +
-                    `Sincronizar inspeções antigas com o Drive e liberar espaço?\n\n` +
-                    `✅ Manterá as 30 inspeções mais recentes\n` +
-                    `☁️ Enviará ${oldInspections} antigas para o Drive\n` +
-                    `🧹 Liberará ~${(usageMB * 0.6).toFixed(1)}MB de espaço`;
-                
-                if (confirm(message)) {
-                    await syncOldInspections();
-                } else {
-                    alert('⚠️ Memória crítica! Você pode sincronizar depois em Configurações → Gerenciar Inspeções');
-                }
-            } else if (level === 'warning') {
-                // 🟡 ALERTA - Mensagem informativa
-                const message = `🟡 Memória chegando no limite\n\n` +
-                    `📊 Uso: ${usageMB}MB (${percentUsed.toFixed(1)}%)\n` +
-                    `📋 Total de inspeções: ${totalInspections}\n` +
-                    `📤 Inspeções antigas: ${oldInspections}\n\n` +
-                    `💡 Deseja sincronizar agora e liberar espaço?\n\n` +
-                    `✅ Manterá as 30 inspeções mais recentes\n` +
-                    `☁️ Enviará ${oldInspections} antigas para o Drive\n` +
-                    `🧹 Liberará ~${(usageMB * 0.4).toFixed(1)}MB de espaço`;
-                
-                if (confirm(message)) {
-                    await syncOldInspections();
-                }
-            }
-        }
-
-        // Sincronizar inspeções antigas com Drive e limpar localStorage - MODO HÍBRIDO
-        async function syncOldInspections() {
-            try {
-                showProgress('🔄 Sincronizando inspeções antigas...');
-                
-                // Verificar se tem conexão com Drive
-                if (!accessToken) {
-                    hideProgress();
-                    alert('⚠️ Não conectado ao Google Drive!\n\nConecte-se primeiro em Configurações → Google Drive');
-                    return;
-                }
-                
-                const inspectionsStr = safeLocalStorageGet('inspections');
-                if (!inspectionsStr) {
-                    hideProgress();
-                    return;
-                }
-                
-                const allInspections = safeJSONParse(inspectionsStr, []);
-                
-                // Ordenar por timestamp (mais recentes primeiro)
-                allInspections.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
-                // Separar: manter 30 mais recentes, sincronizar o resto
-                const recentInspections = allInspections.slice(0, 30);
-                const oldInspections = allInspections.slice(30);
-                
-                console.log(`📊 Total: ${allInspections.length} | Recentes: ${recentInspections.length} | Antigas: ${oldInspections.length}`);
-                
-                if (oldInspections.length === 0) {
-                    hideProgress();
-                    alert('✅ Nenhuma inspeção antiga para sincronizar!\n\nVocê tem apenas ' + allInspections.length + ' inspeções.');
-                    return;
-                }
-                
-                // Sincronizar inspeções antigas que ainda não estão no Drive
-                let syncedCount = 0;
-                let skippedCount = 0;
-                let errorCount = 0;
-                
-                for (let i = 0; i < oldInspections.length; i++) {
-                    const inspection = oldInspections[i];
-                    
-                    // Atualizar progresso
-                    showProgress(`🔄 Sincronizando ${i + 1}/${oldInspections.length}...`);
-                    
-                    // Verificar se já foi sincronizada (tem driveFileId)
-                    if (inspection.driveFileId) {
-                        console.log(`⏭️ Inspeção ${inspection.id} já está no Drive, pulando...`);
-                        skippedCount++;
-                        continue;
-                    }
-                    
-                    // Tentar sincronizar
-                    try {
-                        // IMPORTANTE: Essa inspeção não tem fotos no localStorage
-                        // As fotos já devem ter sido enviadas quando a inspeção foi criada
-                        // Aqui vamos apenas garantir que os metadados estejam no Drive
-                        
-                        await saveToGoogleDrive(inspection);
-                        syncedCount++;
-                        console.log(`✅ Inspeção ${inspection.id} sincronizada com sucesso`);
-                    } catch (error) {
-                        console.error(`❌ Erro ao sincronizar inspeção ${inspection.id}:`, error);
-                        errorCount++;
-                        // Continuar com as outras mesmo se uma falhar
-                    }
-                }
-                
-                // Atualizar localStorage - manter apenas as 30 mais recentes
-                safeLocalStorageSet('inspections', safeJSONStringify(recentInspections));
-                console.log('✅ localStorage atualizado com as 30 inspeções mais recentes');
-                
-                // Calcular espaço liberado
-                const newUsage = getLocalStorageUsage();
-                
-                hideProgress();
-                
-                // Mensagem de resultado
-                let resultMessage = `✅ SINCRONIZAÇÃO CONCLUÍDA!\n\n`;
-                resultMessage += `📤 Sincronizadas: ${syncedCount}\n`;
-                if (skippedCount > 0) resultMessage += `⏭️ Já estavam no Drive: ${skippedCount}\n`;
-                if (errorCount > 0) resultMessage += `❌ Erros: ${errorCount}\n`;
-                resultMessage += `\n💾 Espaço local agora: ${newUsage.mb}MB\n`;
-                resultMessage += `📋 Inspeções locais: ${recentInspections.length}\n`;
-                resultMessage += `☁️ Todas as inspeções antigas estão no Drive!`;
-                
-                alert(resultMessage);
-                
-                // Recarregar lista se estiver na tela de gerenciamento
-                if (typeof loadInspectionsList === 'function') {
-                    loadInspectionsList();
-                }
-                
-            } catch (error) {
-                hideProgress();
-                console.error('❌ Erro na sincronização:', error);
-                alert('❌ Erro ao sincronizar inspeções:\n\n' + error.message);
-            }
-        }
-
         let currentUser = null; // Usuário logado
 
         // ==========================================
@@ -2364,20 +2106,20 @@
             }
         }
         
-        // Função para limpar localStorage se estiver muito cheio - MODO HÍBRIDO (manter apenas 30 inspeções)
+        // Função para limpar localStorage se estiver muito cheio (manter apenas últimas 50 inspeções)
         function cleanupOldInspections() {
             try {
                 const inspectionsStr = safeLocalStorageGet('inspections');
                 if (!inspectionsStr) return;
                 
                 const inspections = safeJSONParse(inspectionsStr, []);
-                if (inspections.length > 30) {
-                    // Ordenar por timestamp e manter apenas as 30 mais recentes
+                if (inspections.length > 50) {
+                    // Ordenar por timestamp e manter apenas as 50 mais recentes
                     inspections.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                    const recentInspections = inspections.slice(0, 30);
+                    const recentInspections = inspections.slice(0, 50);
                     
                     safeLocalStorageSet('inspections', safeJSONStringify(recentInspections));
-                    console.log(`🧹 Limpeza automática: removidas ${inspections.length - 30} inspeções antigas (mantidas as 30 mais recentes)`);
+                    console.log(`🧹 Limpeza: removidas ${inspections.length - 50} inspeções antigas`);
                 }
             } catch (e) {
                 console.error('❌ Erro na limpeza de inspeções antigas:', e);
@@ -2413,15 +2155,31 @@
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
             
+            console.log('🔐 Tentativa de login para usuário:', username);
+            
             if (!username || !password) {
                 alert('⚠️ Por favor, preencha usuário e senha.');
                 return;
             }
             
             const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+            console.log('👥 Total de usuários no sistema:', users.length);
+            
+            if (users.length === 0) {
+                alert('❌ Nenhum usuário cadastrado no sistema!\n\n' +
+                      '🔧 O sistema criará o usuário admin padrão.\n\n' +
+                      'Usuário: admin\n' +
+                      'Senha: admin123\n\n' +
+                      'Por favor, recarregue a página e tente novamente.');
+                console.error('❌ Nenhum usuário cadastrado!');
+                return;
+            }
+            
             const user = users.find(u => u.username === username && u.password === password);
             
             if (user) {
+                console.log('✅ Login bem-sucedido para:', user.name);
+                
                 // Login bem-sucedido
                 currentUser = user;
                 localStorage.setItem('currentUser', JSON.stringify(user));
@@ -2477,7 +2235,8 @@
                 
                 playSound('success');
             } else {
-                alert('❌ Usuário ou senha incorretos!');
+                console.log('❌ Login falhou: credenciais inválidas');
+                alert('❌ Usuário ou senha incorretos!\n\nVerifique suas credenciais e tente novamente.');
                 document.getElementById('loginPassword').value = '';
                 document.getElementById('loginPassword').focus();
             }
@@ -3778,19 +3537,11 @@
                 
                 files.forEach((file, index) => {
                     const reader = new FileReader();
-                    reader.onload = async function(event) {
-                        // Comprimir foto antes de adicionar
-                        const compressedPhoto = await compressImageBeforeSave(event.target.result);
-                        
+                    reader.onload = function(event) {
                         photoData[itemIdToUse].push({
-                            data: compressedPhoto,
+                            data: event.target.result,
                             name: file.name
                         });
-                        
-                        // Verificar saúde do armazenamento
-                        if (processedCount % 5 === 0) {
-                            checkStorageHealth();
-                        }
                         
                         processedCount++;
                         console.log(`✅ Foto ${processedCount}/${files.length} processada`);
@@ -3981,7 +3732,7 @@
         }
 
         // Capturar foto
-        async function capturePhoto() {
+        function capturePhoto() {
             try {
                 const video = document.getElementById('cameraVideo');
                 
@@ -4002,12 +3753,7 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 
                 // Converter para base64
-                // Converter para base64 e comprimir
-                const rawPhoto = canvas.toDataURL('image/jpeg', 0.9);
-                capturedPhotoData = await compressImageBeforeSave(rawPhoto);
-                
-                // Verificar saúde do armazenamento
-                checkStorageHealth();
+                capturedPhotoData = canvas.toDataURL('image/jpeg', 0.9);
                 
                 // Validar se a foto foi capturada
                 if (!capturedPhotoData || capturedPhotoData.length < 100) {
@@ -7783,33 +7529,6 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
             });
             document.getElementById('totalPhotos').textContent = totalPhotos;
             
-            // Calcular uso de memória
-            const memoryUsage = getLocalStorageUsage();
-            const memoryMB = parseFloat(memoryUsage.mb);
-            const memoryPercent = (memoryMB / 10 * 100).toFixed(1); // Assumindo ~10MB de limite
-            
-            const memoryElement = document.getElementById('memoryUsage');
-            const percentElement = document.getElementById('memoryPercent');
-            
-            if (memoryElement) {
-                memoryElement.textContent = `${memoryUsage.mb} MB`;
-                
-                // Colorir baseado no uso
-                if (memoryMB > 8) {
-                    memoryElement.style.color = '#f44336'; // Vermelho
-                } else if (memoryMB > 7) {
-                    memoryElement.style.color = '#FF9800'; // Laranja
-                } else if (memoryMB > 5) {
-                    memoryElement.style.color = '#FFC107'; // Amarelo
-                } else {
-                    memoryElement.style.color = '#4CAF50'; // Verde
-                }
-            }
-            
-            if (percentElement) {
-                percentElement.textContent = `${memoryPercent}% usado`;
-            }
-            
             loadCommonIssues(inspections);
             loadCities(inspections);
         }
@@ -7957,31 +7676,9 @@ Digite "DELETAR" em LETRAS MAIÚSCULAS para confirmar:`;
          📋 CHANGELOG - HISTÓRICO DE VERSÕES
 ═══════════════════════════════════════════════
 
-🆕 Versão V3.4 - Novembro 2025 [MODO HÍBRIDO]
+🆕 Versão V00 - Novembro 2025
 ──────────────────────────────────────────────
-🚀 Gerenciamento Inteligente de Memória
-
-Novidades:
-• 🔄 Sincronização automática quando memória enche
-• 💾 Mantém automaticamente as 30 inspeções mais recentes
-• 🟡 Alerta proativo quando chegar a 70-80% de uso
-• 🔴 Sincronização obrigatória quando > 80%
-• ☁️ Backup automático de inspeções antigas no Drive
-• 🧹 Limpeza inteligente de dados antigos
-• 📊 Indicador visual de uso de memória
-
-Como funciona:
-1. Sistema mantém sempre as 30 últimas inspeções
-2. Quando chegar a 70%: pergunta se quer sincronizar
-3. Quando chegar a 80%: exige sincronização
-4. Fotos antigas vão pro Drive, liberando espaço
-5. Tudo automático, zero preocupação!
-
-──────────────────────────────────────────────
-
-🆕 Versão V3.3 - Novembro 2025
-──────────────────────────────────────────────
-✨ Drive Pré-Configurado
+✨ Lançamento inicial do sistema
 
 Funcionalidades:
 • ✅ Inspeção Inicial
@@ -8131,11 +7828,6 @@ Ao continuar usando, você aceita estes termos.
             // Load user settings
             loadSettings();
             
-            // 🔄 MODO HÍBRIDO - Limpeza automática e verificação de memória
-            console.log('🧹 Executando limpeza automática...');
-            cleanupOldInspections(); // Mantém apenas 30 inspeções automaticamente
-            checkStorageHealth(); // Verifica se precisa sincronizar
-            
             // SEMPRE inicializar Google Drive API (necessário para carregar bibliotecas)
             console.log('🔄 Inicializando APIs do Google Drive...');
             initializeGoogleDrive();
@@ -8145,6 +7837,21 @@ Ao continuar usando, você aceita estes termos.
             if (savedUser) {
                 try {
                     currentUser = JSON.parse(savedUser);
+                    
+                    // VALIDAR SE O USUÁRIO AINDA EXISTE NO SISTEMA
+                    const users = JSON.parse(localStorage.getItem('systemUsers')) || [];
+                    const userExists = users.find(u => u.username === currentUser.username);
+                    
+                    if (!userExists) {
+                        console.warn('⚠️ Usuário salvo não existe mais no sistema. Fazendo logout...');
+                        localStorage.removeItem('currentUser');
+                        currentUser = null;
+                        // Garantir que tela de login está visível
+                        document.getElementById('loginScreen').classList.add('active');
+                        alert('⚠️ Sua sessão expirou. Por favor, faça login novamente.');
+                        return;
+                    }
+                    
                     console.log('✅ Sessão ativa encontrada:', currentUser.name);
                     
                     // Ocultar tela de login
@@ -8190,4 +7897,22 @@ Ao continuar usando, você aceita estes termos.
                             console.warn('⚠️ Timeout ao inicializar APIs do Google. Continuando em modo local.');
                             showMainMenu(); // Mostrar menu mesmo sem Drive
                         }
-  
+                    }, 10000);
+                    
+                } catch (e) {
+                    console.error('Erro ao restaurar sessão:', e);
+                    localStorage.removeItem('currentUser');
+                    currentUser = null;
+                    // Garantir que tela de login está visível
+                    document.getElementById('loginScreen').classList.add('active');
+                    alert('⚠️ Erro ao restaurar sessão. Por favor, faça login novamente.');
+                }
+            } else {
+                console.log('🔐 Nenhuma sessão ativa. Aguardando login...');
+                // GARANTIR que a tela de login está visível
+                document.getElementById('loginScreen').classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
