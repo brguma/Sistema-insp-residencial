@@ -4273,7 +4273,7 @@
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue') {
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -4828,7 +4828,7 @@
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue') {
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -5153,7 +5153,7 @@
                         const item = inspection.checklist[itemId];
                         
                         // FILTRAR: Ignorar IDs inválidos (alertas, sistema, etc)
-                        if (item.status === 'issue') {
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -5354,13 +5354,20 @@
                 return false;
             }
             
-            // Ignorar APENAS IDs de sistema/alertas que claramente não são problemas reais
-            const invalidPrefixes = ['alert', 'system', 'notification', 'undefined', 'null'];
+            // LISTA DE IDs QUE NÃO SÃO PROBLEMAS DE INSPEÇÃO
+            const invalidIds = [
+                'alert', 'system', 'notification', 'undefined', 'null',
+                // Configurações do sistema:
+                'alertdriveDisconnected', 'confirmbeforeexit', 'soundeffects',
+                'driveonly', 'compactmode', 'hidetooltips', 'simplemode',
+                'theme', 'fontsize', 'primarycolor', 'photoquality'
+            ];
+            
             const itemLower = itemId.toLowerCase();
             
-            // Retornar falso APENAS se começar com prefixo claramente inválido
-            for (const prefix of invalidPrefixes) {
-                if (itemLower.startsWith(prefix)) {
+            // Retornar falso se for exatamente igual ou começar com algum ID inválido
+            for (const invalidId of invalidIds) {
+                if (itemLower === invalidId || itemLower.startsWith(invalidId)) {
                     return false;
                 }
             }
@@ -5579,8 +5586,35 @@
         function collectChecklistData() {
             const checklist = {};
             
+            // LISTA DE IDs QUE NÃO SÃO PROBLEMAS DE INSPEÇÃO (configurações do sistema)
+            const systemConfigIds = [
+                'alertDriveDisconnected',
+                'confirmBeforeExit', 
+                'soundEffects',
+                'driveOnly',
+                'compactMode',
+                'hideTooltips',
+                'simpleMode',
+                'theme',
+                'fontSize',
+                'primaryColor',
+                'photoQuality'
+            ];
+            
             document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
                 const itemId = checkbox.id;
+                
+                // FILTRAR configurações do sistema - NÃO são problemas de inspeção!
+                if (systemConfigIds.includes(itemId)) {
+                    console.log(`⏭️ Ignorando configuração do sistema: ${itemId}`);
+                    return; // Pular este item
+                }
+                
+                // FILTRAR IDs vazios ou inválidos
+                if (!itemId || itemId.trim() === '') {
+                    console.log('⏭️ Ignorando checkbox sem ID');
+                    return;
+                }
                 
                 // Coletar múltiplas ocorrências
                 const occurrences = [];
@@ -5614,6 +5648,8 @@
                     occurrences: occurrences // Novo campo com todas as ocorrências
                 };
             });
+            
+            console.log('📋 Checklist coletado (SEM configurações do sistema):', Object.keys(checklist));
             
             return checklist;
         }
@@ -6075,7 +6111,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             let count = 0;
             if (inspection.checklist) {
                 Object.values(inspection.checklist).forEach(item => {
-                    if (item.status === 'issue') count++;
+                    if (item.status === 'issue' && isValidInspectionItem(itemId)) count++;
                 });
             }
             return count;
@@ -6475,7 +6511,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue') {
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
@@ -6877,7 +6913,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue') {
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
                         
                         console.log(`🔍 Processando: ${itemId}, Status: ${item.status}`);
                             const categoryName = getCategoryNameFromId(itemId);
