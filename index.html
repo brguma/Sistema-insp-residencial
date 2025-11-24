@@ -6046,10 +6046,16 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
         }
 
         function loadDatabaseView() {
+            console.log('📊 === CARREGANDO DATABASE VIEW ===');
+            console.log('📋 Total de inspeções no array:', inspections.length);
+            console.log('📋 Inspeções:', inspections);
+            
             // Atualizar estatísticas
             const totalInspections = inspections.length;
             const totalInicial = inspections.filter(i => i.type === 'inicial').length;
             const totalCompleta = inspections.filter(i => i.type === 'completa').length;
+            
+            console.log(`📊 Estatísticas: Total=${totalInspections}, Inicial=${totalInicial}, Completa=${totalCompleta}`);
             
             document.getElementById('dbTotalInspections').textContent = totalInspections;
             document.getElementById('dbTotalInicial').textContent = totalInicial;
@@ -6068,13 +6074,24 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
             });
             
             // Renderizar lista
+            console.log('🎨 Chamando renderInspectionsList com', inspections.length, 'inspeções');
             renderInspectionsList(inspections);
         }
 
         function renderInspectionsList(filteredInspections) {
+            console.log('🎨 === RENDERIZANDO LISTA ===');
+            console.log('📋 Inspeções filtradas recebidas:', filteredInspections.length);
+            console.log('📋 Dados:', filteredInspections);
+            
             const container = document.getElementById('inspectionsListContainer');
             
+            if (!container) {
+                console.error('❌ Container inspectionsListContainer NÃO ENCONTRADO!');
+                return;
+            }
+            
             if (filteredInspections.length === 0) {
+                console.log('📭 Nenhuma inspeção para exibir');
                 container.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #999;">
                         <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
@@ -6084,19 +6101,30 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 return;
             }
             
+            console.log('✅ Renderizando', filteredInspections.length, 'inspeção(ões)');
+            
             // Ordenar por data (mais recentes primeiro)
             const sorted = [...filteredInspections].sort((a, b) => {
                 return new Date(b.timestamp) - new Date(a.timestamp);
             });
             
             let html = '';
-            sorted.forEach(inspection => {
+            sorted.forEach((inspection, index) => {
+                console.log(`   [${index + 1}] Renderizando: ${inspection.endereco}, ${inspection.numero}`);
+                
                 const typeBadge = inspection.type === 'inicial' ? 
                     '<span class="inspection-type-badge badge-inicial">INICIAL</span>' :
                     '<span class="inspection-type-badge badge-completa">COMPLETA</span>';
                 
-                const problems = countProblems(inspection);
-                const photos = countPhotos(inspection);
+                let problems = 0;
+                let photos = 0;
+                
+                try {
+                    problems = countProblems(inspection);
+                    photos = countPhotos(inspection);
+                } catch (error) {
+                    console.error(`   ❌ Erro ao contar problemas/fotos para ${inspection.id}:`, error);
+                }
                 
                 html += `
                     <div class="inspection-card" style="border: 1px solid #e0e0e0; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: white; transition: all 0.3s;" 
@@ -6144,14 +6172,18 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 `;
             });
             
+            console.log('✅ HTML gerado, tamanho:', html.length, 'caracteres');
             container.innerHTML = html;
+            console.log('✅ HTML inserido no container');
         }
 
         function countProblems(inspection) {
             let count = 0;
             if (inspection.checklist) {
-                Object.values(inspection.checklist).forEach(item => {
-                    if (item.status === 'issue' && isValidInspectionItem(itemId)) count++;
+                Object.entries(inspection.checklist).forEach(([itemId, item]) => {
+                    if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        count++;
+                    }
                 });
             }
             return count;
