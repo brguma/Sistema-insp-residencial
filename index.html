@@ -1273,16 +1273,8 @@
                 Acesso restrito • Usuários autorizados apenas
             </p>
             
-            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
-                <p style="margin: 0; font-size: 12px; color: #856404; text-align: center;">
-                    <b>🔑 Login Padrão:</b><br/>
-                    Usuário: <code style="background: white; padding: 2px 6px; border-radius: 3px;">admin</code><br/>
-                    Senha: <code style="background: white; padding: 2px 6px; border-radius: 3px;">admin123</code>
-                </p>
-            </div>
-            
             <button onclick="if(confirm('⚠️ ATENÇÃO: Isso resetará TODOS os usuários do sistema e criará apenas o usuário admin padrão.\\n\\n❌ Os dados de login serão perdidos!\\n✅ As inspeções não serão afetadas.\\n\\nDeseja continuar?')) { localStorage.removeItem(\'systemUsers\'); localStorage.removeItem(\'currentUser\'); location.reload(); }" 
-                    style="margin-top: 10px; width: 100%; padding: 10px; background: #f44336; color: white; border: none; border-radius: 5px; font-size: 12px; cursor: pointer;">
+                    style="margin-top: 15px; width: 100%; padding: 10px; background: #f44336; color: white; border: none; border-radius: 5px; font-size: 12px; cursor: pointer;">
                 🔄 Resetar Sistema de Login
             </button>
         </div>
@@ -2533,6 +2525,12 @@
                 } catch (error) {
                     console.error('❌ Erro ao carregar do Drive:', error);
                     hideProgress();
+                    
+                    // Se o erro for de pasta não configurada, alertar usuário
+                    if (error.message.includes('Pasta compartilhada não configurada')) {
+                        alert('⚠️ Pasta compartilhada do Google Drive não configurada!\n\nAcesse: Menu → Configurações → Google Drive → Pasta Centralizada');
+                    }
+                    
                     console.log('⚠️ Tentando carregar do armazenamento local...');
                 }
             } else {
@@ -2540,12 +2538,44 @@
             }
             
             // Fallback: carregar do localStorage
-            const stored = localStorage.getItem('inspections');
-            if (stored) {
-                inspections = JSON.parse(stored);
-                console.log(`📦 ${inspections.length} inspeções carregadas do localStorage`);
-            } else {
-                console.log('📭 Nenhuma inspeção encontrada localmente');
+            try {
+                const stored = localStorage.getItem('inspections');
+                if (stored) {
+                    // Tentar fazer parse
+                    try {
+                        inspections = JSON.parse(stored);
+                        console.log(`📦 ${inspections.length} inspeções carregadas do localStorage`);
+                        
+                        // IMPORTANTE: Limpar fotos do localStorage de inspeções antigas para economizar espaço
+                        let needsCleanup = false;
+                        inspections.forEach(inspection => {
+                            if (inspection.photos && Object.keys(inspection.photos).length > 0) {
+                                // Inspeção antiga com fotos no localStorage
+                                console.log(`🧹 Limpando fotos antigas da inspeção: ${inspection.id}`);
+                                inspection.hasPhotos = true;
+                                inspection.photos = {}; // Limpar fotos para economizar espaço
+                                needsCleanup = true;
+                            }
+                        });
+                        
+                        if (needsCleanup) {
+                            console.log('🧹 Salvando inspeções sem fotos antigas no localStorage...');
+                            safeLocalStorageSet('inspections', safeJSONStringify(inspections));
+                        }
+                        
+                    } catch (parseError) {
+                        console.error('❌ Erro ao fazer parse do localStorage:', parseError);
+                        alert('⚠️ Erro ao carregar inspeções locais. Os dados podem estar corrompidos.\n\nRecomendamos reconectar ao Google Drive para recuperar os dados.');
+                        inspections = [];
+                    }
+                } else {
+                    console.log('📭 Nenhuma inspeção encontrada localmente');
+                    inspections = [];
+                }
+            } catch (storageError) {
+                console.error('❌ Erro ao acessar localStorage:', storageError);
+                alert('⚠️ Erro ao acessar armazenamento local.\n\nVerifique se não está em modo de navegação privada.');
+                inspections = [];
             }
         }
 
@@ -2568,8 +2598,6 @@
                 
                 const rootFolderId = SHARED_FOLDER_ID;
                 console.log('📁 Usando pasta compartilhada (TODOS usam esta):', rootFolderId);
-                
-                console.log('📁 Pasta raiz encontrada:', rootFolderId);
 
                 // Buscar pastas de tipo (inicial e completa)
                 const typeFolders = await gapi.client.drive.files.list({
@@ -2578,54 +2606,83 @@
                     spaces: 'drive'
                 });
 
-                for (const typeFolder of typeFolders.result.files) {
-                    console.log('📂 Processando tipo:', typeFolder.name);
-                    
-                    // Buscar pastas de data
-                    const dateFolders = await gapi.client.drive.files.list({
-                        q: `'${typeFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-                        fields: 'files(id, name)',
-                        spaces: 'drive'
-                    });
+                if (!typeFolders.result.files || typeFolders.result.files.length === 0) {
+                    console.log('📭 Nenhuma pasta de tipo encontrada no Drive');
+                    return;
+                }
 
-                    for (const dateFolder of dateFolders.result.files) {
-                        // Buscar pastas de endereço
-                        const addressFolders = await gapi.client.drive.files.list({
-                            q: `'${dateFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                console.log(`📂 ${typeFolders.result.files.length} pasta(s) de tipo encontrada(s)`);
+
+                for (const typeFolder of typeFolders.result.files) {
+                    console.log(`📂 Processando tipo: ${typeFolder.name}`);
+                    
+                    try {
+                        // Buscar pastas de data
+                        const dateFolders = await gapi.client.drive.files.list({
+                            q: `'${typeFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
                             fields: 'files(id, name)',
                             spaces: 'drive'
                         });
 
-                        for (const addressFolder of addressFolders.result.files) {
-                            // Buscar arquivo inspecao.json dentro da pasta
-                            const jsonFiles = await gapi.client.drive.files.list({
-                                q: `'${addressFolder.id}' in parents and name='inspecao.json' and trashed=false`,
-                                fields: 'files(id, name)',
-                                spaces: 'drive'
-                            });
-
-                            if (jsonFiles.result.files && jsonFiles.result.files.length > 0) {
-                                const fileId = jsonFiles.result.files[0].id;
-                                
-                                // Baixar conteúdo do arquivo
-                                const response = await gapi.client.drive.files.get({
-                                    fileId: fileId,
-                                    alt: 'media'
+                        for (const dateFolder of dateFolders.result.files) {
+                            try {
+                                // Buscar pastas de endereço
+                                const addressFolders = await gapi.client.drive.files.list({
+                                    q: `'${dateFolder.id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                                    fields: 'files(id, name)',
+                                    spaces: 'drive'
                                 });
 
-                                const inspection = JSON.parse(response.body);
-                                inspection.driveFileId = fileId;
-                                inspection.driveFolderId = addressFolder.id;
-                                inspections.push(inspection);
-                                console.log('  ✅ Inspeção carregada:', inspection.endereco, inspection.numero);
+                                for (const addressFolder of addressFolders.result.files) {
+                                    try {
+                                        // Buscar arquivo inspecao.json dentro da pasta
+                                        const jsonFiles = await gapi.client.drive.files.list({
+                                            q: `'${addressFolder.id}' in parents and name='inspecao.json' and trashed=false`,
+                                            fields: 'files(id, name)',
+                                            spaces: 'drive'
+                                        });
+
+                                        if (jsonFiles.result.files && jsonFiles.result.files.length > 0) {
+                                            const fileId = jsonFiles.result.files[0].id;
+                                            
+                                            // Baixar conteúdo do arquivo
+                                            const response = await gapi.client.drive.files.get({
+                                                fileId: fileId,
+                                                alt: 'media'
+                                            });
+
+                                            const inspection = JSON.parse(response.body);
+                                            inspection.driveFileId = fileId;
+                                            inspection.driveFolderId = addressFolder.id;
+                                            
+                                            // Garantir que não tenha fotos no objeto (economizar memória)
+                                            if (inspection.photos && Object.keys(inspection.photos).length > 0) {
+                                                inspection.hasPhotos = true;
+                                                inspection.photos = {}; // Limpar fotos
+                                            }
+                                            
+                                            inspections.push(inspection);
+                                            console.log(`  ✅ Inspeção carregada: ${inspection.endereco}, ${inspection.numero}`);
+                                        }
+                                    } catch (fileError) {
+                                        console.error(`  ❌ Erro ao processar arquivo em ${addressFolder.name}:`, fileError);
+                                        // Continuar com próximo arquivo
+                                    }
+                                }
+                            } catch (addressError) {
+                                console.error(`  ❌ Erro ao processar pasta de endereço em ${dateFolder.name}:`, addressError);
+                                // Continuar com próxima pasta
                             }
                         }
+                    } catch (dateError) {
+                        console.error(`  ❌ Erro ao processar pasta de data em ${typeFolder.name}:`, dateError);
+                        // Continuar com próxima pasta
                     }
                 }
 
                 console.log(`✅ Total de ${inspections.length} inspeções carregadas do Drive`);
                 
-                // Sincronizar com localStorage também
+                // Sincronizar com localStorage também (SEM FOTOS)
                 safeLocalStorageSet('inspections', safeJSONStringify(inspections));
                 
             } catch (error) {
