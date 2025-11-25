@@ -6978,6 +6978,7 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                 
                 // LOGS DE DEBUG DETALHADOS
                 console.log("📊 ===== HTML EXPORT: INÍCIO =====");
+                console.log("📋 Checklist completo:", inspection.checklist);
                 console.log("📋 Total de chaves no checklist:", inspection.checklist ? Object.keys(inspection.checklist).length : 0);
                 console.log("📋 Chaves:", inspection.checklist ? Object.keys(inspection.checklist) : []);
                 
@@ -6985,9 +6986,14 @@ Relatório gerado em: ${new Date().toLocaleString('pt-BR')}
                     Object.keys(inspection.checklist).forEach(itemId => {
                         const item = inspection.checklist[itemId];
                         
-                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                        console.log(`\n🔍 ITEM: ${itemId}`);
+                        console.log(`   Status: ${item.status}`);
+                        console.log(`   Observação: ${item.observation || 'N/A'}`);
+                        console.log(`   Occurrences: ${item.occurrences ? item.occurrences.length : 0}`);
+                        console.log(`   É válido? ${isValidInspectionItem(itemId)}`);
                         
-                        console.log(`🔍 Processando: ${itemId}, Status: ${item.status}`);
+                        if (item.status === 'issue' && isValidInspectionItem(itemId)) {
+                            console.log(`   ✅ INCLUÍDO NO RELATÓRIO!`);
                             const categoryName = getCategoryNameFromId(itemId);
                             const itemName = getItemNameFromId(itemId);
                             
